@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel Control System - Acesso de Segurança</title>
+    
+    <!-- PWA Instalável -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <script>
+      if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
+      }
+    </script>
+    
+    <!-- Fontes e Ícones -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --bg-dark: #0f172a;
+            --surface: rgba(30, 41, 59, 0.7);
+            --border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            color: var(--text-main);
+        }
+
+        /* Lado Esquerdo - Banner Corporativo */
+        .split-banner {
+            flex: 1.2;
+            position: relative;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.4) 100%), 
+                        url('https://images.unsplash.com/photo-1519003722824-194d4455a60c?q=80&w=2000&auto=format&fit=crop') center/cover no-repeat;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 60px;
+        }
+
+        .banner-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(180deg, rgba(15,23,42,0.1) 0%, rgba(15,23,42,0.95) 100%);
+            z-index: 1;
+        }
+
+        .banner-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .brand-logo {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo i { color: var(--primary); }
+
+        .banner-text h1 {
+            font-size: 3.5rem;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            font-weight: 700;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .banner-text p {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 480px;
+            line-height: 1.6;
+        }
+
+        /* Lado Direito - Glassmorphism UI */
+        .split-form {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            position: relative;
+        }
+
+        /* Form Container - Gerencia as Views */
+        .auth-container {
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+        }
+
+        .auth-view {
+            display: none;
+            opacity: 0;
+            transform: translateX(20px);
+            transition: all 0.4s cubic-bezier(0.1, 0.7, 0.1, 1);
+        }
+
+        .auth-view.active {
+            display: block; /* Wait, block transition issue? I will handle in JS to avoid jumps */
+        }
+        .auth-view.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Elementos de Formulário */
+        .view-title { font-size: 1.8rem; font-weight: 600; margin-bottom: 8px; }
+        .view-subtitle { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 30px; }
+
+        .input-group { margin-bottom: 20px; text-align: left; position: relative; }
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        
+        .input-field {
+            width: 100%;
+            padding: 14px 16px;
+            padding-left: 42px;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        .input-field:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15); background: rgba(0,0,0,0.3); }
+        .input-icon { position: absolute; left: 16px; top: 38px; color: var(--text-muted); font-size: 1.1rem; }
+
+        .btn-submit {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
+            margin-top: 10px;
+        }
+        
+        .btn-submit:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 15px 30px -5px rgba(59, 130, 246, 0.5); }
+        .btn-submit:active { transform: translateY(0); }
+
+        .links-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 25px;
+            font-size: 0.9rem;
+        }
+        .links-row a { color: var(--text-muted); text-decoration: none; transition: 0.2s; cursor: pointer; }
+        .links-row a:hover { color: var(--primary); }
+
+        /* Estilo do 2FA OTP */
+        .otp-container { display: flex; gap: 10px; justify-content: center; margin-bottom: 30px; }
+        .otp-slot {
+            width: 50px; height: 60px;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fff;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .otp-slot:focus { border-color: var(--primary); }
+
+        /* Modal de Ajuda Dinâmico e Sobre */
+        #helpModal, #aboutModal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center;
+            z-index: 100;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .modal-body {
+            background: #1e293b;
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1);
+        }
+        .modal-body h3 { margin-bottom: 10px; color: #fff; }
+        .modal-body p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem; }
+        .contact-pill {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: var(--primary);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn-close {
+            margin-top: 20px;
+            background: transparent; color: var(--text-muted);
+            border: none; cursor: pointer; font-size: 0.9rem; font-weight: 500;
+        }
+        .btn-close:hover { color: #fff; }
+
+        @media (max-width: 960px) {
+            .split-banner { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Lado Esquerdo -->
+    <div class="split-banner">
+        <div class="banner-overlay"></div>
+        <div class="brand-logo banner-content">
+            <i class="fa-solid fa-gas-pump"></i> NexusFleet
+        </div>
+        <div class="banner-text banner-content">
+            <h1>Controle. <br>Eficiência. <br>Resultados.</h1>
+            <p>O painel logístico mais avançado do setor. Administre custos de frotas, manutenção preventiva e rotas mapeadas de qualquer lugar.</p>
+        </div>
+    </div>
+
+    <!-- Lado Direito -->
+    <div class="split-form">
+        <div class="auth-container">
+            
+            <!-- VIEW 1: LOGIN -->
+            <div id="viewLogin" class="auth-view" style="display: block;">
+                <h2 class="view-title">Bem-vindo de volta</h2>
+                <p class="view-subtitle">Insira suas credenciais para acessar o radar da frota.</p>
+                
+                <form id="formLogin" onsubmit="handleLoginSubmit(event)">
+                    <div class="input-group">
+                        <label>E-mail Corporativo</label>
+                        <i class="fa-solid fa-envelope input-icon"></i>
+                        <input type="email" class="input-field" placeholder="seu.nome@transportes.com" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Código de Acesso (Senha)</label>
+                        <i class="fa-solid fa-lock input-icon"></i>
+                        <input type="password" class="input-field" placeholder="••••••••" required>
+                    </div>
+                    
+                    <button type="submit" class="btn-submit" id="btnLoginWrapper">
+                        <span id="btnLoginText">Autenticar Sistema</span>
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                    </button>
+                    
+                    <div class="links-row">
+                        <a onclick="switchView('viewRegister')">Nova Frota? Criar conta</a>
+                        <a onclick="openHelp()">Precisa de ajuda?</a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- VIEW 2: CADASTRO -->
+            <div id="viewRegister" class="auth-view">
+                <h2 class="view-title">Construir Base de Dados</h2>
+                <p class="view-subtitle">Cadastre os servidores da sua transportadora agora.</p>
+                
+                <form id="formRegister" onsubmit="handleRegisterSubmit(event)">
+                    <div class="input-group">
+                        <label>Nome do Operador</label>
+                        <i class="fa-solid fa-user-tie input-icon"></i>
+                        <input type="text" class="input-field" placeholder="Ex: Carlos Administrativo" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label>E-mail Administrativo</label>
+                        <i class="fa-solid fa-envelope input-icon"></i>
+                        <input type="email" class="input-field" placeholder="contato@empresa.com" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Crie uma Senha Forte</label>
+                        <i class="fa-solid fa-key input-icon"></i>
+                        <input type="password" class="input-field" placeholder="No mínimo 8 caracteres" required minlength="8">
+                    </div>
+                    
+                    <button type="submit" class="btn-submit" id="btnRegWrapper">
+                        <span id="btnRegText">Solicitar Credencial</span>
+                        <i class="fa-solid fa-user-plus"></i>
+                    </button>
+                    
+                    <div class="links-row" style="justify-content: center;">
+                        <a onclick="switchView('viewLogin')"><i class="fa-solid fa-arrow-left"></i> Já possui base? Retornar ao Login</a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- VIEW 3: VERIFICAÇÃO 2FA -->
+            <div id="viewVerify" class="auth-view">
+                <div style="text-align: center; margin-bottom: 25px;">
+                    <i class="fa-solid fa-shield-halved" style="font-size: 3.5rem; color: var(--primary); margin-bottom: 15px;"></i>
+                    <h2 class="view-title" style="font-size: 1.5rem;">Cofre Trancado</h2>
+                    <p class="view-subtitle" style="margin-bottom: 15px;">Módulo de segurança ativo. Enviamos um pacote para rastreio no seu email. Digite o código de averiguação.</p>
+                </div>
+                
+                <form id="formVerify" onsubmit="handleVerifySubmit(event)">
+                    <div class="otp-container">
+                        <input type="text" class="otp-slot" maxlength="1" onkeyup="moveFocus(this, 'otp2', null)" id="otp1" required autocomplete="off">
+                        <input type="text" class="otp-slot" maxlength="1" onkeyup="moveFocus(this, 'otp3', 'otp1')" id="otp2" required autocomplete="off">
+                        <input type="text" class="otp-slot" maxlength="1" onkeyup="moveFocus(this, 'otp4', 'otp2')" id="otp3" required autocomplete="off">
+                        <input type="text" class="otp-slot" maxlength="1" onkeyup="moveFocus(this, 'otp5', 'otp3')" id="otp4" required autocomplete="off">
+                        <input type="text" class="otp-slot" maxlength="1" onkeyup="moveFocus(this, 'otp6', 'otp4')" id="otp5" required autocomplete="off">
+                        <input type="text" class="otp-slot" maxlength="1" onkeyup="moveFocus(this, null, 'otp5')" id="otp6" required autocomplete="off">
+                    </div>
+                    
+                    <button type="submit" class="btn-submit" id="btnVerifyWrapper">
+                        <span id="btnVerifyText">Validar e Liberar Acesso</span>
+                        <i class="fa-solid fa-unlock-keyhole"></i>
+                    </button>
+                    
+                    <div class="links-row">
+                        <a onclick="switchView('viewLogin')">Abortar conexão</a>
+                        <a onclick="alert('Um novo pacote foi despachado para sua caixa de entrada!')" style="color:var(--primary)">Reenviar Email</a>
+                    </div>
+                </form>
+            </div>
+            <div style="text-align:center; margin-top:35px; padding-top: 20px; border-top: 1px solid var(--border);">
+                <a onclick="openAbout()" style="color:var(--text-muted); font-size:0.85rem; cursor:pointer; text-decoration: none; transition: 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'"><i class="fa-solid fa-graduation-cap"></i> Quem Somos (Projeto Acadêmico FAM)</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Quem Somos -->
+    <div id="aboutModal">
+        <div class="modal-body" id="aboutModalBody" style="max-width: 500px;">
+            <i class="fa-solid fa-graduation-cap" style="font-size: 3rem; color: var(--primary); margin-bottom: 15px;"></i>
+            <h3>Quem Somos</h3>
+            <p style="color: var(--primary); font-weight: bold; margin-bottom: 15px;">Projeto Acadêmico - Faculdade de Americana (FAM)</p>
+            <p>O <b>NexusFleet</b> foi desenvolvido exclusivamente para fins acadêmicos avaliativos como parte da exigência curricular e sob autoria dos alunos responsáveis <b>Leonardo Bonatti</b> e <b>João Emílio</b>.</p>
+            
+            <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3674.3312015403063!2d-47.33230628448882!3d-22.753066338167385!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94c899c75bf669ff%3A0xc34cc5555417ad43!2sFaculdade%20de%20Americana!5e0!3m2!1spt-BR!2sbr!4v1712534567890!5m2!1spt-BR!2sbr" width="100%" height="200" style="border:0; border-radius: 8px; margin-bottom: 15px;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            
+            <p style="font-size: 0.85rem; margin-bottom: 5px;"><i class="fa-solid fa-location-dot"></i> Av. Joaquim Bôer, 733 - Jardim Luciane</p>
+            <p style="font-size: 0.85rem;">Americana - SP, 13477-360</p>
+
+            <button class="btn-close" onclick="closeAbout()">Confirmar Leitura</button>
+        </div>
+    </div>
+
+    <!-- Modal de Ajuda -->
+    <div id="helpModal">
+        <div class="modal-body" id="helpModalBody">
+            <i class="fa-solid fa-headset" style="font-size: 3rem; color: var(--primary); margin-bottom: 15px;"></i>
+            <h3>Engenharia de Acesso</h3>
+            <p>Seus dados de embarque parecem trancados? Contate diretamente nossos administradores de infraestrutura pelos canais 24h:</p>
+            
+            <div class="contact-pill"><i class="fa-brands fa-whatsapp"></i> (19) 98203-4147</div>
+            <div class="contact-pill"><i class="fa-brands fa-whatsapp"></i> (19) 99665-8075</div>
+            
+            <button class="btn-close" onclick="closeHelp()">Dispensar o Suporte</button>
+        </div>
+    </div>
+
+    <!-- Engine JS para transições super fluidas e prototipagem -->
+    <script>
+        // Init visual
+        setTimeout(() => document.getElementById('viewLogin').classList.add('show'), 100);
+
+        function switchView(targetId) {
+            const views = document.querySelectorAll('.auth-view');
+            
+            // Fade out the current
+            let current = null;
+            views.forEach(v => {
+                if(v.classList.contains('show')) {
+                    v.classList.remove('show');
+                    current = v;
+                }
+            });
+
+            // Wait fade out to change display
+            setTimeout(() => {
+                if(current) current.style.display = 'none';
+                const target = document.getElementById(targetId);
+                target.style.display = 'block';
+                
+                // Allow DOM to update display:block before fading in
+                setTimeout(() => target.classList.add('show'), 50);
+            }, 400); // tempo de transição CSS
+        }
+
+        // Simula loading num botão e procede
+        function fakeNetworkRequest(btnWrapperId, btnTextId, originalText, callback) {
+            const btn = document.getElementById(btnWrapperId);
+            const textSpan = document.getElementById(btnTextId);
+            
+            btn.style.opacity = '0.8';
+            btn.style.pointerEvents = 'none';
+            textSpan.innerHTML = '<i class="fa-solid fa-satellite-dish fa-fade"></i> Criptografando...';
+            
+            // Simula ping do servidor
+            setTimeout(() => {
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+                textSpan.innerHTML = originalText;
+                callback();
+            }, 1800);
+        }
+
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            const emailInput = e.target.querySelector('input[type="email"]').value;
+            const name = emailInput.split('@')[0];
+            localStorage.setItem('fcs_pending_name', name.charAt(0).toUpperCase() + name.slice(1));
+
+            fakeNetworkRequest('btnLoginWrapper', 'btnLoginText', 'Autenticar Sistema', () => {
+                // Ao logar, envia para verificação MFA sempre, simulando ambiente bancario corporativo.
+                switchView('viewVerify');
+            });
+        }
+
+        function handleRegisterSubmit(e) {
+            e.preventDefault();
+            const nameInput = e.target.querySelector('input[type="text"]').value;
+            const firstName = nameInput.split(' ')[0];
+            localStorage.setItem('fcs_pending_name', firstName.charAt(0).toUpperCase() + firstName.slice(1));
+
+            fakeNetworkRequest('btnRegWrapper', 'btnRegText', 'Solicitar Credencial', () => {
+                // Criação vai para o verifier do mesmo jeito
+                switchView('viewVerify');
+            });
+        }
+
+        function handleVerifySubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnVerifyWrapper');
+            btn.style.background = 'var(--success, #10b981)'; // Cor de sucesso
+            
+            fakeNetworkRequest('btnVerifyWrapper', 'btnVerifyText', 'Sucesso! Liberando Painel...', () => {
+                // Acesso concedido
+                localStorage.setItem('fcs_auth', 'true');
+                const pendingName = localStorage.getItem('fcs_pending_name') || 'Admin';
+                localStorage.setItem('fcs_username', pendingName);
+                window.location.href = 'index.html';
+            });
+        }
+
+        // Lógica dos inputs do código (move focus automaticamente)
+        function moveFocus(current, nextId, prevId) {
+            const key = event.key;
+            if (key === 'Backspace' && prevId) {
+                document.getElementById(prevId).focus();
+            } else if (current.value.length >= 1 && nextId) {
+                document.getElementById(nextId).focus();
+            }
+        }
+
+        // Lógica do Modal Help
+        function openHelp() {
+            const m = document.getElementById('helpModal');
+            const b = document.getElementById('helpModalBody');
+            m.style.display = 'flex';
+            setTimeout(() => {
+                m.style.opacity = '1';
+                b.style.transform = 'scale(1)';
+            }, 10);
+        }
+        function closeHelp() {
+            const m = document.getElementById('helpModal');
+            const b = document.getElementById('helpModalBody');
+            m.style.opacity = '0';
+            b.style.transform = 'scale(0.9)';
+            setTimeout(() => { m.style.display = 'none'; }, 300);
+        }
+
+        // Lógica do Modal About / Quem Somos
+        function openAbout() {
+            const m = document.getElementById('aboutModal');
+            const b = document.getElementById('aboutModalBody');
+            m.style.display = 'flex';
+            setTimeout(() => {
+                m.style.opacity = '1';
+                b.style.transform = 'scale(1)';
+            }, 10);
+        }
+        function closeAbout() {
+            const m = document.getElementById('aboutModal');
+            const b = document.getElementById('aboutModalBody');
+            m.style.opacity = '0';
+            b.style.transform = 'scale(0.9)';
+            setTimeout(() => { m.style.display = 'none'; }, 300);
+        }
+    </script>
+</body>
+</html>

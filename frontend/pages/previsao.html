@@ -1,0 +1,41 @@
+<!-- previsao.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-chart-pie" style="color: var(--primary-color);"></i> Previsão Analítica de Gastos</h2>
+    <p>Um algoritmo de Machine Learning alimentado pelos seus dados estima a projeção de queima de caixa dos seus carros no próximo trimestre.</p>
+</div>
+
+<div class="dashboard-widgets" style="margin-bottom: 25px;">
+    <div class="kpi-card" onclick="navigateTo('financeiro')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <div class="kpi-icon"><i class="fa-solid fa-money-bill-wave"></i></div>
+        <div class="kpi-info">
+            <h3>Gasto Estimado (Próx. 30 dias)</h3>
+            <p id="prevMensal">Calculando...</p>
+            <span class="trend down"><i class="fa-solid fa-arrow-trend-up"></i> +5.2% Correção Simulada</span>
+        </div>
+    </div>
+    <div class="kpi-card" onclick="navigateTo('historico')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <div class="kpi-icon"><i class="fa-solid fa-chart-column"></i></div>
+        <div class="kpi-info">
+            <h3>Projeção Trimestral Global</h3>
+            <p id="prevTrimestral">Calculando...</p>
+            <span class="trend"><i class="fa-solid fa-bullseye"></i> Alta Confiança Geométrica (94%)</span>
+        </div>
+    </div>
+    <div class="kpi-card alert" onclick="navigateTo('diagnostico')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <div class="kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="kpi-info">
+            <h3>Risco Operacional Previsto</h3>
+            <p>Componentes de Freio</p>
+            <span>Odometria sugere troca no mês 2</span>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-charts">
+    <div class="chart-container" style="background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-md);">
+        <h3 style="margin-bottom: 15px; color: var(--text-main); font-weight: 600;"><i class="fa-solid fa-robot" style="color: var(--warning);"></i> Regressão Linear Aplicada: Custos Passados vs Futuro</h3>
+        <div style="position: relative; height: 350px; width: 100%;">
+            <canvas id="forecastChart"></canvas>
+        </div>
+    </div>
+</div>

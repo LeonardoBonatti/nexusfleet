@@ -1,0 +1,68 @@
+<!-- veiculos.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-car" style="color: var(--primary-color);"></i> Gestão de Veículos</h2>
+    <p>Cadastre e gerencie a frota de veículos disponíveis ativamente no sistema.</p>
+</div>
+
+<div class="form-container">
+    <form id="vehicleForm">
+        <div class="form-row">
+            <div class="form-group">
+                <label><i class="fa-solid fa-id-card"></i> Placa do Veículo</label>
+                <input type="text" name="plate" placeholder="Ex: ABC-1234" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fa-solid fa-truck"></i> Modelo / Versão</label>
+                <input type="text" name="model" placeholder="Ex: Gol 1.0 Flex" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label><i class="fa-solid fa-copyright"></i> Fabricante (Marca)</label>
+                <input type="text" name="brand" placeholder="Ex: Volkswagen" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fa-solid fa-calendar"></i> Ano de Fabricação</label>
+                <input type="number" name="year" placeholder="Ex: 2020" min="1950" max="2100" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label><i class="fa-solid fa-gas-pump"></i> Tipo Padrão de Combustível</label>
+                <select name="fuel_type" required>
+                    <option value="Flex">Flex (Gasolina/Álcool)</option>
+                    <option value="Gasolina">Gasolina</option>
+                    <option value="Diesel">Diesel</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><i class="fa-solid fa-box"></i> Capacidade do Tanque (Litros)</label>
+                <input type="number" step="0.5" name="capacity" placeholder="Ex: 55 Litros" required>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-primary"><i class="fa-solid fa-plus"></i> Registrar Veículo na Frota</button>
+    </form>
+</div>
+
+<!-- CONTAINER DE VEÍCULOS SALVOS -->
+<div class="form-container" style="max-width: 100%; margin-top: 30px;">
+    <h3 style="margin-bottom: 15px; color: var(--text-main);"><i class="fa-solid fa-list"></i> Frota Ativa</h3>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted);">
+                    <th style="padding: 10px;">ID Frota</th>
+                    <th style="padding: 10px;">Placa</th>
+                    <th style="padding: 10px;">Marca & Modelo</th>
+                    <th style="padding: 10px;">Status</th>
+                </tr>
+            </thead>
+            <tbody id="vehicleLogBody">
+                <!-- Injetado pelo Banco de Dados Virtual -->
+            </tbody>
+        </table>
+    </div>
+</div>

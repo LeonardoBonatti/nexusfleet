@@ -1,0 +1,52 @@
+<!-- agenda.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-calendar-check" style="color: var(--primary-color);"></i> Agenda Inteligente de Obrigações</h2>
+    <p>O cérebro fiscal da frota. Não perca prazos de IPVA, Licenciamento, Seguros e evite multas indesejáveis ou apreensões na pista.</p>
+</div>
+
+<!-- FORMULÁRIO DE NOVO LEMBRETE -->
+<div class="form-container" style="max-width: 100%; margin-bottom: 25px;">
+    <h3 style="margin-bottom: 15px; color: var(--text-main);"><i class="fa-solid fa-clock-rotate-left"></i> Adicionar Lembrete Customizado</h3>
+    <form id="reminderForm">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Título do Evento</label>
+                <input type="text" name="title" placeholder="Ex: Renovação Seguro SulAmérica" required>
+            </div>
+            <div class="form-group">
+                <label>Data Limite</label>
+                <input type="date" name="date" required style="cursor: text;">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Descrição Opcional ou Veículo</label>
+                <input type="text" name="desc" placeholder="Ex: Apólice nº 9987 finalizando para a Tracker" required>
+            </div>
+        </div>
+        <button type="submit" class="btn-primary" style="margin-top: 5px;"><i class="fa-solid fa-calendar-plus"></i> Agendar Tarefa</button>
+    </form>
+</div>
+
+<div class="form-container" style="max-width: 100%; margin-top: 10px; background: transparent; border: none; box-shadow: none; padding:0;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h3 style="color: var(--text-main); font-size: 1.3rem;"><i class="fa-solid fa-bell" style="color: var(--warning);"></i> Timeline Consolidade de Vencimentos</h3>
+    </div>
+
+    <div id="agendaTimeline">
+        <!-- Vencimentos gerados dinamicamente via JS baseados nas Placas -->
+    </div>
+</div>
+
+<style>
+.agenda-card { display: flex; align-items: center; background: var(--bg-card); border: 1px solid var(--border-color); border-left: 5px solid var(--primary-color); border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: var(--shadow-sm); transition: transform 0.2s, box-shadow 0.2s; }
+.agenda-card:hover { transform: translateX(5px); box-shadow: var(--shadow-md); }
+.agenda-card.urgent { border-left-color: var(--danger); background: rgba(220, 38, 38, 0.03); border-width: 1px; border-left-width: 5px; border-color: rgba(220, 38, 38, 0.5); }
+.agenda-card.warning { border-left-color: var(--warning); background: rgba(245, 158, 11, 0.03); border-width: 1px; border-left-width: 5px; border-color: rgba(245, 158, 11, 0.5); }
+.agenda-date { font-weight: 800; font-size: 1.6rem; min-width: 80px; text-align: center; color: var(--text-main); line-height: 1; border-right: 2px solid var(--border-color); padding-right: 15px; margin-right: 15px; }
+.agenda-month { display: block; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 500; margin-top: 4px; letter-spacing: 1px; }
+.agenda-details { flex-grow: 1; }
+.agenda-title { font-weight: 600; font-size: 1.1rem; color: var(--text-main); margin-bottom: 4px; }
+.agenda-sub { color: var(--text-muted); font-size: 0.95rem; }
+.agenda-action { margin-left: auto; }
+</style>

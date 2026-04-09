@@ -1,0 +1,24 @@
+<!-- comparador.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-gauge-high" style="color: var(--primary-color);"></i> Ranking de Eficiência da Frota</h2>
+    <p>Esta análise de motor exibe em tempo real o rendimento da sua frota listada, destacando heróis de economia e focos de gasto.</p>
+</div>
+
+<div class="form-container" style="max-width: 100%; margin-top: 10px;">
+    <h3 style="margin-bottom: 15px; color: var(--text-main);"><i class="fa-solid fa-trophy" style="color: var(--warning);"></i> Tabela Comparativa km/L</h3>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); background: var(--bg-main);">
+                    <th style="padding: 15px;">Placa Veículo</th>
+                    <th style="padding: 15px;">Modelo Especificado</th>
+                    <th style="padding: 15px;">Média de Eficiência</th>
+                    <th style="padding: 15px;">Diagnóstico de Gasto</th>
+                </tr>
+            </thead>
+            <tbody id="eficienciaLogBody">
+                <!-- Injetado via Motor Javascript -->
+            </tbody>
+        </table>
+    </div>
+</div>

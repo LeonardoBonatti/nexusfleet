@@ -1,0 +1,51 @@
+<!-- saude.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-heart-pulse" style="color: var(--primary-color);"></i> Sistema de Saúde das Máquinas</h2>
+    <p>Monitoramento ativo do desgaste das peças. Acompanhe a estimativa de vida útil e saiba o momento exato de realizar a próxima manutenção para evitar explosão de custos.</p>
+</div>
+
+<div class="dashboard-widgets" style="margin-bottom: 25px;">
+    <div class="kpi-card" data-active-filter="ok" onclick="filterHealthCards('ok')" style="border-left: 4px solid var(--success); cursor: pointer; transition: all 0.3s;">
+        <div class="kpi-icon"><i class="fa-solid fa-check-circle" style="color: var(--success);"></i></div>
+        <div class="kpi-info" id="saudeOk">
+            <h3>Saúde Impecável</h3>
+            <p>Calculando...</p>
+            <span>Nenhuma intervenção necessária</span>
+        </div>
+    </div>
+    <div class="kpi-card" data-active-filter="warn" onclick="filterHealthCards('warn')" style="border-left: 4px solid var(--warning); cursor: pointer; transition: all 0.3s;">
+        <div class="kpi-icon"><i class="fa-solid fa-triangle-exclamation" style="color: var(--warning);"></i></div>
+        <div class="kpi-info" id="saudeAtencao">
+            <h3>Atenção Recomendada</h3>
+            <p>Calculando...</p>
+            <span>Desgaste avançado detectado</span>
+        </div>
+    </div>
+    <div class="kpi-card alert" data-active-filter="crit" onclick="filterHealthCards('crit')" style="border-left: 4px solid var(--danger); cursor: pointer; transition: all 0.3s;">
+        <div class="kpi-icon"><i class="fa-solid fa-skull-crossbones"></i></div>
+        <div class="kpi-info" id="saudeCritico">
+            <h3>Estado Crítico</h3>
+            <p>Calculando...</p>
+            <span>Risco iminente de quebra</span>
+        </div>
+    </div>
+</div>
+
+<div class="form-container" style="max-width: 100%; padding: 25px; background: transparent; border: none; box-shadow: none;">
+    <h3 style="margin-bottom: 20px; color: var(--text-main);"><i class="fa-solid fa-stethoscope" style="color: var(--primary-color);"></i> Relatório de Desgaste por Veículo</h3>
+    <div id="healthReportsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+        <!-- Injetado por JS -->
+    </div>
+</div>
+
+<style>
+.health-bar-bg { width: 100%; height: 8px; background: rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden; margin-top: 5px; }
+body.dark-mode .health-bar-bg { background: rgba(255,255,255,0.1); }
+.health-fill { height: 100%; border-radius: 10px; transition: width 1.5s cubic-bezier(0.1, 0.7, 0.1, 1); }
+.health-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-sm); transition: transform 0.2s;}
+.health-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--primary-color); }
+.health-item { margin-bottom: 15px; }
+.health-item:last-child { margin-bottom: 0; }
+.health-label { display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 500; }
+.car-badge { font-size:0.75rem; background: var(--bg-main); color: var(--text-muted); padding:3px 10px; border-radius:12px; border: 1px solid var(--border-color); margin-left:auto; }
+</style>

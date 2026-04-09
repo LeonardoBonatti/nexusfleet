@@ -1,0 +1,47 @@
+<!-- dashboard.html -->
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+    <div>
+        <h2><i class="fa-solid fa-chart-line" style="color: var(--primary-color);"></i> Visão Geral da Frota</h2>
+        <p>Acompanhe os principais indicadores de consumo e manutenções em tempo real.</p>
+    </div>
+    <button class="btn-primary" id="btnExportPDF" onclick="exportDashboardToPDF()" style="padding: 10px 20px; font-size: 0.95rem; box-shadow: 0 4px 15px rgba(59,130,246,0.3); transition: transform 0.2s; display:flex; align-items:center; gap:8px;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+        <i class="fa-solid fa-file-pdf"></i> Exportar Relatório Geral
+    </button>
+</div>
+
+<div class="dashboard-widgets" style="margin-bottom: 25px;">
+    <!-- KPIs -->
+    <div class="kpi-card" onclick="navigateTo('financeiro')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <div class="kpi-icon"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+        <div class="kpi-info">
+            <h3>Custo Mensal Geral (Combustível + Manut.)</h3>
+            <p id="dashTotalCost">R$ 0,00</p>
+            <span class="trend"><i class="fa-solid fa-minus"></i> Sincronizado ao vivo</span>
+        </div>
+    </div>
+    <div class="kpi-card" onclick="navigateTo('comparador')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <div class="kpi-icon"><i class="fa-solid fa-gauge-high"></i></div>
+        <div class="kpi-info">
+            <h3>Eficiência Média</h3>
+            <p>12.5 km/L</p>
+            <span class="trend down"><i class="fa-solid fa-arrow-down"></i> Ranking de performance</span>
+        </div>
+    </div>
+    <div class="kpi-card alert" onclick="navigateTo('diagnostico')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <div class="kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="kpi-info">
+            <h3>Alertas Analíticos Ativos</h3>
+            <p id="dashAlertsCount">Detecção Automática</p>
+            <span>Feed do Motor</span>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-charts">
+    <div class="chart-container" style="background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-md);">
+        <h3 style="margin-bottom: 15px; color: var(--text-main); font-weight: 600;"><i class="fa-solid fa-chart-line" style="color: var(--primary-color);"></i> Comparativo de Custos Mensais: Gasolina vs Diesel</h3>
+        <div style="position: relative; height: 350px; width: 100%;">
+            <canvas id="dashboardChart"></canvas>
+        </div>
+    </div>
+</div>

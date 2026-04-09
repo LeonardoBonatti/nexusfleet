@@ -1,0 +1,33 @@
+<!-- historico.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-clock-rotate-left" style="color: var(--primary-color);"></i> Histórico Inteligente</h2>
+    <p>Linha do tempo consolidada. Veja todos os eventos (Abastecimento e Manutenção) ocorridos na frota.</p>
+</div>
+
+<div class="dashboard-widgets" style="margin-bottom: 20px;">
+    <div class="form-group" style="flex:1;">
+        <label>Filtrar por Período</label>
+        <select>
+            <option>Últimos 30 dias</option>
+            <option>Últimos 6 meses</option>
+            <option>Este ano</option>
+        </select>
+    </div>
+</div>
+
+<div class="form-container" style="max-width: 100%; padding: 20px;">
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+            <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted);">
+                <th style="padding: 12px;">Data</th>
+                <th style="padding: 12px;">Veículo</th>
+                <th style="padding: 12px;">Evento</th>
+                <th style="padding: 12px;">Detalhes</th>
+                <th style="padding: 12px;">Custo (R$)</th>
+            </tr>
+        </thead>
+            <tbody id="historicoGeralBody">
+                <!-- Informações Injetadas pelo Banco -->
+            </tbody>
+    </table>
+</div>

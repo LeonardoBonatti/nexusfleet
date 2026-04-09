@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel Control System - Dashboard Profissional</title>
+    
+    <!-- PWA Instalável -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <script>
+      if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
+      }
+    </script>
+    
+    <!-- CSS Global -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- FontAwesome para Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- LeafletJS (Mapas Gratuitos) CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script>
+        // Auth Guard: Se não houver token válido de login, joga para a tela de login
+        if(localStorage.getItem('fcs_auth') !== 'true') {
+            window.location.href = 'login.html';
+        }
+    </script>
+    <style>
+        .profile-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 15px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 250px;
+            box-shadow: var(--shadow-md);
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.2s cubic-bezier(0.1, 0.7, 0.1, 1);
+        }
+        .profile-dropdown.open {
+            visibility: visible;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .dropdown-header { padding: 15px; border-bottom: 1px solid var(--border-color); }
+        .dropdown-header h4 { color: var(--text-main); font-size: 1rem; margin-bottom: 2px; }
+        .dropdown-header p { color: var(--text-muted); font-size: 0.8rem; }
+        .dropdown-list { list-style: none; padding: 10px 0; margin: 0; }
+        .dropdown-list li { padding: 10px 20px; color: var(--text-main); font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: background 0.2s; }
+        .dropdown-list li:hover { background: rgba(59, 130, 246, 0.1); color: var(--primary-color); }
+        .dropdown-list li i { width: 14px; text-align: center; color: var(--text-muted); }
+        .dropdown-list li:hover i { color: var(--primary-color); }
+        .dropdown-divider { height: 1px; background: var(--border-color); margin: 5px 0; }
+        .logout-item { color: var(--danger) !important; }
+        .logout-item i { color: var(--danger) !important; }
+        .logout-item:hover { background: rgba(239, 68, 68, 0.1) !important; }
+
+        /* Generic Modals for Profile Actions */
+        .fcs-modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 2000; visibility: hidden; opacity: 0; transition: all 0.3s;
+        }
+        .fcs-modal-overlay.active { visibility: visible; opacity: 1; }
+        
+        .fcs-modal-box {
+            background: var(--bg-card); width: 100%; max-width: 450px;
+            border-radius: 16px; border: 1px solid var(--border-color);
+            padding: 30px; transform: scale(0.9); transition: all 0.3s cubic-bezier(0.1, 0.7, 0.1, 1);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            max-height: 90vh; overflow-y: auto;
+        }
+        .fcs-modal-overlay.active .fcs-modal-box { transform: scale(1); }
+        
+        .fcs-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .fcs-modal-header h3 { display: flex; align-items: center; gap: 10px; color: var(--text-main); margin: 0; }
+        .fcs-modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; }
+        .fcs-modal-close:hover { color: var(--danger); }
+        
+        /* Language Grid */
+        .lang-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .lang-btn { text-align: left; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); padding: 12px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .lang-btn:hover { border-color: var(--primary); background: rgba(59, 130, 246, 0.1); }
+        .lang-btn.active { border-color: var(--primary); background: var(--primary); color: white; }
+
+        /* Hide Google Translate Default UI */
+        body { top: 0 !important; }
+        .goog-te-banner-frame { display: none !important; }
+        div#goog-gt-tt { display: none !important; }
+        .goog-tooltip { display: none !important; }
+        .goog-tooltip:hover { display: none !important; }
+        .goog-text-highlight { background-color: transparent !important; border: none !important; box-shadow: none !important; }
+    </style>
+</head>
+<body>
+
+    <div class="layout-wrapper">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fa-solid fa-gas-pump"></i> NexusFleet</h2>
+            </div>
+            
+            <!-- Barra de Busca do Menu -->
+            <div class="sidebar-search">
+                <input type="text" id="menuSearch" placeholder="Buscar menu..." data-i18n-ph="menu_search" onkeyup="filterMenu()">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </div>
+
+            <nav class="sidebar-nav" id="sidebar-nav">
+                <ul>
+                    <li class="menu-item active"><a href="#" data-page="dashboard"><i class="fa-solid fa-chart-line"></i> <span data-i18n="menu_dashboard">Dashboard</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="abastecimento"><i class="fa-solid fa-fill-drip"></i> <span data-i18n="menu_supply">Abastecimento</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="veiculos"><i class="fa-solid fa-car"></i> <span data-i18n="menu_vehicles">Veículos</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="historico"><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="menu_history">Histórico Inteligente</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="mapa_postos"><i class="fa-solid fa-map-location-dot"></i> <span data-i18n="menu_stations">Mapa de Postos</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="comparador"><i class="fa-solid fa-scale-balanced"></i> <span data-i18n="menu_compare">Comparador de Combustível</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="previsao"><i class="fa-solid fa-money-bill-wave"></i> <span data-i18n="menu_forecast">Previsão de Gastos</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="financeiro"><i class="fa-solid fa-wallet"></i> <span data-i18n="menu_finance">Controle Financeiro</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="manutencao"><i class="fa-solid fa-screwdriver-wrench"></i> <span data-i18n="menu_maintenance">Manutenção do Veículo</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="saude"><i class="fa-solid fa-heart-pulse"></i> <span data-i18n="menu_health">Sistema de Saúde</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="diagnostico"><i class="fa-solid fa-microscope"></i> <span data-i18n="menu_diagnosis">Diagnóstico Inteligente</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="agenda"><i class="fa-solid fa-calendar-check"></i> <span data-i18n="menu_schedule">Agenda Inteligente</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="integracao_mapas"><i class="fa-solid fa-map"></i> <span data-i18n="menu_maps">Integração de Mapas</span></a></li>
+                    <li class="menu-item"><a href="#" data-page="assistente"><i class="fa-solid fa-robot"></i> <span data-i18n="menu_ai">Assistente Inteligente</span></a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- CONTEÚDO PRINCIPAL -->
+        <main class="main-content">
+            <!-- NAVBAR (Topo do main) -->
+            <header class="top-navbar">
+                <div class="nav-left">
+                    <button id="toggleSidebar" class="btn-icon"><i class="fa-solid fa-bars"></i></button>
+                    <h2 data-i18n="kpi_top_title">Dashboard</h2>
+                </div>
+                <div class="nav-right" style="display:flex; align-items:center; gap:15px; position: relative;">
+                    <!-- Botão de Toggle Dark Mode -->
+                    <button id="themeToggle" class="btn-icon" title="Trocar Tema"><i class="fa-solid fa-moon"></i></button>
+                    
+                    <div class="user-profile" id="userProfileBtn" style="cursor: pointer; position: relative; transition: opacity 0.2s;" title="Opções de Perfil" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                        <img id="userAvatar" src="https://ui-avatars.com/api/?name=Admin+User&background=0D8ABC&color=fff" alt="User Avatar" style="object-fit: cover;">
+                        <span id="userNameDisplay">Admin</span>
+                        <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem; margin-left: 5px; color: var(--text-muted);"></i>
+                    </div>
+
+                    <!-- Dropdown Menu -->
+                    <div id="profileMenu" class="profile-dropdown">
+                        <div class="dropdown-header">
+                            <h4 id="dropdownName">Admin</h4>
+                            <p id="dropdownRole">Gestor Operacional</p>
+                        </div>
+                        <ul class="dropdown-list">
+                            <li onclick="document.getElementById('avatarUpload').click()"><i class="fa-solid fa-camera"></i> <span data-i18n="drop_avatar">Alterar Foto do Perfil</span></li>
+                            <li onclick="openProfileModal('settingsModal')"><i class="fa-solid fa-gear"></i> <span data-i18n="drop_settings">Configurações Gerais</span></li>
+                            <li onclick="openProfileModal('langModal')"><i class="fa-solid fa-language"></i> <span data-i18n="drop_lang">Idioma</span> (<span id="currentLangDropdown">PT-BR</span>)</li>
+                            <li onclick="openProfileModal('helpSupportModal')"><i class="fa-solid fa-circle-question"></i> <span data-i18n="drop_support">Ajuda e Suporte</span></li>
+                            <div class="dropdown-divider"></div>
+                            <li class="logout-item" onclick="localStorage.removeItem('fcs_auth'); window.location.href='login.html';"><i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="drop_logout">Sair do Painel</span></li>
+                        </ul>
+                    </div>
+
+                    <!-- Input Oculto para Câmera/Galeria -->
+                    <input type="file" id="avatarUpload" accept="image/*" capture="user" style="display: none;">
+                </div>
+            </header>
+
+            <!-- CONTAINER DINÂMICO DE PÁGINAS -->
+            <div class="page-container">
+                <!-- Exemplo de Dashboard Content injetado -->
+                <div class="dashboard-widgets">
+                    <!-- KPIs -->
+                    <div class="kpi-card">
+                        <div class="kpi-icon"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+                        <div class="kpi-info">
+                            <h3 data-i18n="kpi_cost_title">Custo Mensal</h3>
+                            <p>R$ 1.250,00</p>
+                            <span class="trend up"><i class="fa-solid fa-arrow-up"></i> 5% <span data-i18n="kpi_cost_desc">em relação ao mês passado</span></span>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon"><i class="fa-solid fa-gauge-high"></i></div>
+                        <div class="kpi-info">
+                            <h3 data-i18n="kpi_eff_title">Eficiência Média</h3>
+                            <p>12.5 km/l</p>
+                            <span class="trend down"><i class="fa-solid fa-arrow-down"></i> -2% <span data-i18n="kpi_eff_desc">na frota</span></span>
+                        </div>
+                    </div>
+                    <div class="kpi-card alert">
+                        <div class="kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div class="kpi-info">
+                            <h3 data-i18n="kpi_alert_title">Alertas Analíticos</h3>
+                            <p data-i18n="kpi_alert_num">2 Veículos</p>
+                            <span data-i18n="kpi_alert_desc">Consumo irregular detectado</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-charts">
+                    <div class="chart-container">
+                        <h3 data-i18n="kpi_chart_title">Consumo e Gastos (Gráfico Dummy)</h3>
+                        <div class="dummy-chart" style="height: 250px; background: var(--bg-card); display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px dashed var(--border-color); margin-top: 15px;">
+                            <span style="color: var(--text-muted);">Gráfico seria renderizado com Chart.js aqui</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAIS DE PERFIL -->
+    <div id="settingsModal" class="fcs-modal-overlay" onclick="closeProfileModalOnBg(event, 'settingsModal')">
+        <div class="fcs-modal-box">
+            <div class="fcs-modal-header">
+                <h3 data-i18n="modal_sett_title"><i class="fa-solid fa-gear" style="color:var(--primary)"></i> Configurações</h3>
+                <button class="fcs-modal-close" onclick="closeProfileModal('settingsModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:15px;">
+                <div>
+                    <label data-i18n="modal_sett_name" style="color:var(--text-muted); font-size:0.85rem; font-weight:600;">Nome de Exibição / Alias</label>
+                    <input type="text" id="settingNameInput" style="width:100%; padding:12px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:white; border-radius:8px; margin-top:5px; outline:none;" placeholder="Novo nome">
+                </div>
+                <div>
+                    <label data-i18n="modal_sett_role" style="color:var(--text-muted); font-size:0.85rem; font-weight:600;">Cargo na Empresa</label>
+                    <input type="text" id="settingRoleInput" style="width:100%; padding:12px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:white; border-radius:8px; margin-top:5px; outline:none;" placeholder="Acesso corporativo (ex: Analista)" value="Gestor Operacional">
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button data-i18n="modal_sett_btn" style="flex:1; background:var(--primary); color:white; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="saveProfileSettings()" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">Salvar Perfil</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="langModal" class="fcs-modal-overlay" onclick="closeProfileModalOnBg(event, 'langModal')">
+        <div class="fcs-modal-box">
+            <div class="fcs-modal-header">
+                <h3 data-i18n="modal_lang_title"><i class="fa-solid fa-language" style="color:var(--primary)"></i> Idioma do Sistema</h3>
+                <button class="fcs-modal-close" onclick="closeProfileModal('langModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p data-i18n="modal_lang_desc" style="color:var(--text-muted); font-size:0.9rem; margin-bottom:15px;">Aplica-se ao Dashboard, relatórios exportados e respostas neurais da IA.</p>
+            <div class="lang-grid" id="langGridContainer">
+                <!-- Preenchido via JS e botões -->
+                <button class="lang-btn" data-lang="PT-BR" onclick="changeLang('PT-BR', 'Português', this)">Português (Brasil)</button>
+                <button class="lang-btn" data-lang="EN" onclick="changeLang('EN', 'Inglês', this)">English</button>
+                <button class="lang-btn" data-lang="ES" onclick="changeLang('ES', 'Espanhol', this)">Español</button>
+                <button class="lang-btn" data-lang="FR" onclick="changeLang('FR', 'Francês', this)">Français</button>
+                <button class="lang-btn" data-lang="IT" onclick="changeLang('IT', 'Italiano', this)">Italiano</button>
+                <button class="lang-btn" data-lang="DE" onclick="changeLang('DE', 'Alemão', this)">Deutsch</button>
+                <button class="lang-btn" data-lang="JA" onclick="changeLang('JA', 'Japonês', this)">日本語 (Japonês)</button>
+                <button class="lang-btn" data-lang="ZH" onclick="changeLang('ZH', 'Chinês', this)">中文 (Chinês)</button>
+                <button class="lang-btn" data-lang="AR" onclick="changeLang('AR', 'Árabe', this)">العربية (Árabe)</button>
+                <button class="lang-btn" data-lang="RU" onclick="changeLang('RU', 'Russo', this)">Русский (Russo)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="helpSupportModal" class="fcs-modal-overlay" onclick="closeProfileModalOnBg(event, 'helpSupportModal')">
+        <div class="fcs-modal-box" style="text-align: center; max-width: 400px;">
+            <div class="fcs-modal-header" style="justify-content:flex-end; margin-bottom: 0;">
+                <button class="fcs-modal-close" onclick="closeProfileModal('helpSupportModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <i class="fa-solid fa-headset" style="font-size: 3rem; color: var(--primary); margin-bottom: 15px;"></i>
+            <h3 data-i18n="modal_sup_title" style="color: white; margin-bottom: 10px;">Suporte Técnico (N1/N2)</h3>
+            <p data-i18n="modal_sup_desc" style="color:var(--text-muted); font-size:0.95rem; margin-bottom: 25px;">Para dúvidas de infraestrutura em nuvem, controle ou falhas do motor neural, fale com agentes 24h:</p>
+            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--primary); padding: 12px; border-radius: 8px; margin-bottom: 10px; font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 10px;"><i class="fa-brands fa-whatsapp"></i> (19) 98203-4147</div>
+            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--primary); padding: 12px; border-radius: 8px; margin-bottom: 10px; font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 10px;"><i class="fa-brands fa-whatsapp"></i> (19) 99665-8075</div>
+        </div>
+    </div>
+
+    <!-- Bibliotecas Externas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <!-- Google Translate Engine (Invisível) -->
+    <div id="google_translate_element" style="display:none;"></div>
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'pt',
+                includedLanguages: 'en,es,fr,it,de,ja,zh-CN,ar,ru', // PT original é bypass no cookie
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+    <!-- Script Interno -->
+    <script>
+        // Corrige ícones nas modals caso o innerHTML seja perdido
+        const configH3 = document.querySelector('[data-i18n="modal_sett_title"]');
+        if(configH3 && configH3.innerHTML.indexOf('<i') === -1) configH3.innerHTML = '<i class="fa-solid fa-gear" style="color:var(--primary)"></i> Configurações';
+        
+        const langH3 = document.querySelector('[data-i18n="modal_lang_title"]');
+        if(langH3 && langH3.innerHTML.indexOf('<i') === -1) langH3.innerHTML = '<i class="fa-solid fa-language" style="color:var(--primary)"></i> Idioma do Sistema';
+
+        // --- LÓGICA DO DROPDOWN E FOTO DE PERFIL ---
+        const profileBtn = document.getElementById('userProfileBtn');
+        const profileMenu = document.getElementById('profileMenu');
+        
+        profileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileMenu.classList.toggle('open');
+        });
+
+        document.addEventListener('click', (e) => {
+            if(!profileMenu.contains(e.target) && !profileBtn.contains(e.target)) {
+                profileMenu.classList.remove('open');
+            }
+        });
+
+        const avatarUpload = document.getElementById('avatarUpload');
+        avatarUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const base64Str = event.target.result;
+                localStorage.setItem('fcs_avatar', base64Str);
+                document.getElementById('userAvatar').src = base64Str;
+                profileMenu.classList.remove('open');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // --- LÓGICA DO NOME DE EXIBIÇÃO ---
+        const uName = localStorage.getItem('fcs_username') || 'Admin';
+        const displaySpan = document.getElementById('userNameDisplay');
+        const dropdownName = document.getElementById('dropdownName');
+        const avatarImg = document.getElementById('userAvatar');
+        
+        if(displaySpan) displaySpan.textContent = uName;
+        if(dropdownName) dropdownName.textContent = uName;
+        
+        // Verifica se existe foto salva na galeria/camera, se não usa API de iniciais
+        const savedPhoto = localStorage.getItem('fcs_avatar');
+        if(avatarImg) {
+            if(savedPhoto) {
+                avatarImg.src = savedPhoto;
+            } else {
+                avatarImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(uName)}&background=0D8ABC&color=fff`;
+            }
+        }
+
+        // --- SISTEMA DE MODAIS DO PERFIL ---
+        function openProfileModal(id) {
+            profileMenu.classList.remove('open'); // fecha o dropdown
+            document.getElementById(id).classList.add('active'); // abre o modal
+            
+            // Popula os inputs de config com o nome atual
+            if(id === 'settingsModal') {
+                document.getElementById('settingNameInput').value = localStorage.getItem('fcs_username') || 'Admin';
+                document.getElementById('settingRoleInput').value = localStorage.getItem('fcs_role') || 'Gestor Operacional';
+            }
+        }
+
+        function closeProfileModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        function closeProfileModalOnBg(e, id) {
+            if (e.target.id === id) {
+                closeProfileModal(id);
+            }
+        }
+
+        // Salvar Perfil Simulado
+        function saveProfileSettings() {
+            const newName = document.getElementById('settingNameInput').value || 'Admin';
+            const newRole = document.getElementById('settingRoleInput').value || 'Gestor Operacional';
+            
+            localStorage.setItem('fcs_username', newName);
+            localStorage.setItem('fcs_role', newRole);
+            
+            // Atualizar visuais na hora
+            if(displaySpan) displaySpan.textContent = newName;
+            if(dropdownName) dropdownName.textContent = newName;
+            const roleEl = document.getElementById('dropdownRole');
+            if(roleEl) roleEl.textContent = newRole;
+            
+            if(!localStorage.getItem('fcs_avatar') && avatarImg) {
+                avatarImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(newName)}&background=0D8ABC&color=fff`;
+            }
+
+            closeProfileModal('settingsModal');
+        }
+
+        // --- SISTEMA DE IDIOMAS (Via API Global Translate) ---
+        function changeLang(code, nameStr, btnElem) {
+            localStorage.setItem('fcs_lang_code', code);
+            localStorage.setItem('fcs_lang_name', nameStr);
+            
+            let gCode = null;
+            if(code === 'PT-BR') gCode = 'root';
+            else if(code === 'ZH') gCode = '/pt/zh-CN';
+            else gCode = '/pt/' + code.toLowerCase();
+
+            if (gCode === 'root') {
+                document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + location.hostname;
+            } else {
+                document.cookie = "googtrans=" + gCode + "; path=/;";
+                document.cookie = "googtrans=" + gCode + "; path=/; domain=" + location.hostname;
+            }
+            
+            // Recarrega injetando a tradução neural completa no momento da carga da página (DOM 100% atingido)
+            window.location.reload();
+        }
+
+        // Init Idiomas visual
+        const savedLangCode = localStorage.getItem('fcs_lang_code') || 'PT-BR';
+        const currentLangDropdown = document.getElementById('currentLangDropdown');
+        if(currentLangDropdown) currentLangDropdown.textContent = savedLangCode;
+
+        // Auto-check o idioma salvo
+        const savedLangBtn = document.querySelector(`.lang-btn[data-lang="${savedLangCode}"]`);
+        if(savedLangBtn) {
+            savedLangBtn.classList.add('active');
+            savedLangBtn.innerHTML += ' <i class="fa-solid fa-check"></i>';
+        }
+    </script>
+    <script src="app.js"></script>
+</body>
+</html>

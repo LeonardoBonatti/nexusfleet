@@ -1,0 +1,67 @@
+<!-- abastecimento.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-gas-pump" style="color: var(--primary-color);"></i> Registro de Abastecimento</h2>
+    <p>Adicione novos abastecimentos em tempo real para cálculos automáticos de eficiência baseados no odômetro do veículo.</p>
+</div>
+
+<div class="form-container">
+    <form id="fuelRecordForm">
+        <div class="form-group">
+            <label><i class="fa-solid fa-car"></i> Veículo da Frota</label>
+            <select name="vehicle_id" required>
+                <option value="">Selecione o veículo utilizado...</option>
+                <option value="1">Volkswagen Gol 1.0 (Placa: ABC-1234)</option>
+                <option value="2">Fiat Toro Diesel (Placa: XYZ-9876)</option>
+            </select>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label><i class="fa-solid fa-droplet"></i> Tipo de Combustível</label>
+                <select name="fuel_type" required>
+                    <option value="Gasolina">Gasolina Comum</option>
+                    <option value="Gasolina Aditivada">Gasolina Aditivada</option>
+                    <option value="Álcool">Etanol (Álcool)</option>
+                    <option value="Diesel">Diesel S10</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><i class="fa-solid fa-flask"></i> Volume Abastecido (Litros)</label>
+                <input type="number" step="0.01" name="liters" placeholder="Ex: 40.50 Litros" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label><i class="fa-solid fa-money-bill-wave"></i> Preço por Litro (R$)</label>
+                <input type="number" step="0.01" name="price" placeholder="Ex: 5.89" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fa-solid fa-gauge-high"></i> Hodômetro Atual (km)</label>
+                <input type="number" step="0.1" name="odometer" placeholder="Ex: 15400.5 km" required>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Confirmar Lançamento Seguro</button>
+    </form>
+</div>
+
+<!-- CONTAINER DE HISTORICO DE ABASTECIMENTOS -->
+<div class="form-container" style="max-width: 100%; margin-top: 30px;">
+    <h3 style="margin-bottom: 15px; color: var(--text-main);"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Enchimentos</h3>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted);">
+                    <th style="padding: 10px;">Data do Custo</th>
+                    <th style="padding: 10px;">Veículo Relacionado</th>
+                    <th style="padding: 10px;">Custo Despendido (R$)</th>
+                    <th style="padding: 10px;">Comprovação</th>
+                </tr>
+            </thead>
+            <tbody id="fuelLogBody">
+                <!-- Injetado pelo Banco de Dados Virtual -->
+            </tbody>
+        </table>
+    </div>
+</div>

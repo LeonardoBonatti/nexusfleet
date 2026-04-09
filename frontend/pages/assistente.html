@@ -1,0 +1,21 @@
+<!-- assistente.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-robot" style="color: var(--primary-color);"></i> Assistente IA da Frota</h2>
+    <p>Consulte a inteligência artificial para obter insights dos seus dados.</p>
+</div>
+
+<div class="form-container" style="max-width: 100%; display: flex; flex-direction: column; height: 60vh;">
+    <div id="aiChatBox" style="flex: 1; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 20px; padding: 20px; overflow-y: auto; background: var(--bg-main);">
+        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0;"><i class="fa-solid fa-robot"></i></div>
+            <div style="background: var(--bg-card); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); flex: 1;">
+                <p>Olá! Sou a Inteligência Artificial integrada da sua frota. Eu leio seus painéis, despesas e gastos o tempo todo. O que você quer analisar no momento?</p>
+            </div>
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+        <input type="text" id="aiChatInput" placeholder="Ex: Qual foi meu gasto total esse mês? Me resuma a frota..." style="flex: 1; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-size: 1rem; outline: none;" onkeypress="if(event.key === 'Enter') document.getElementById('aiChatSend').click()">
+        <button id="aiChatSend" class="btn-primary" style="margin-top: 0; width: 60px;"><i class="fa-solid fa-paper-plane"></i></button>
+    </div>
+</div>

@@ -1,0 +1,93 @@
+<!-- integracao_mapas.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-route" style="color: var(--primary-color);"></i> Logística e OSRM Mapping</h2>
+    <p>Calcule rotas eficientes cruzando sua malha viária com os postos mais baratos do radar para lucrar em cada viajem.</p>
+</div>
+
+<!-- Catalogo de Clientes -->
+<div class="form-container" style="max-width: 100%; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 style="color: var(--text-main);"><i class="fa-solid fa-address-book" style="color: var(--warning);"></i> Catálogo de Endereços Locais</h3>
+    </div>
+    <form id="addressBookForm" style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <input type="text" name="bookName" placeholder="Nome (Ex: Galpão Central, Cliente Fast)" required style="flex: 1; min-width: 200px;">
+        <input type="text" name="bookAddress" placeholder="Endereço exato para o Satélite buscar depois (Ex: Rua 1, Campinas)" required style="flex: 2; min-width: 300px;">
+        <button type="submit" class="btn-primary" style="white-space: nowrap;"><i class="fa-solid fa-bookmark"></i> Fixar no Catálogo</button>
+    </form>
+</div>
+
+<div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+    <!-- Painel de Cálculos -->
+    <div class="form-container" style="flex: 1; min-width: 320px;">
+        <h3 style="margin-bottom: 15px; color: var(--text-main);"><i class="fa-solid fa-location-arrow" style="color: var(--primary-color);"></i> Router Logístico</h3>
+        <form id="routingForm">
+            <div class="form-group" style="position: relative;">
+                <label>Origem (Onde a frota está)</label>
+                <div style="display: flex; gap: 5px;">
+                    <div style="flex: 1; position: relative;">
+                        <input type="text" id="routeOrigin" placeholder="Digite endereço pausadamente..." required autocomplete="off">
+                        <ul id="originSugg" class="auto-sugg"></ul>
+                    </div>
+                    <button type="button" class="btn-primary" title="Usar Catálogo" onclick="openCatalog('routeOrigin')" style="background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding: 0 15px; box-shadow:none;"><i class="fa-solid fa-book-open"></i></button>
+                </div>
+            </div>
+            
+            <div class="form-group" style="position: relative;">
+                <label>Ponto de Descarga (Destino)</label>
+                <div style="display: flex; gap: 5px;">
+                    <div style="flex: 1; position: relative;">
+                        <input type="text" id="routeDest" placeholder="Digite para o radar rastrear..." required autocomplete="off">
+                        <ul id="destSugg" class="auto-sugg"></ul>
+                    </div>
+                    <button type="button" class="btn-primary" title="Usar Catálogo" onclick="openCatalog('routeDest')" style="background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-main); padding: 0 15px; box-shadow:none;"><i class="fa-solid fa-book-open"></i></button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Veículo Acionado</label>
+                <select id="routeVehicle" required>
+                    <!-- Injetado dinamicamente via JS -->
+                </select>
+            </div>
+            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 10px;"><i class="fa-solid fa-map-location-dot"></i> Gerar Mapa de Condução e Economia</button>
+        </form>
+
+        <div id="routeResult" style="margin-top: 20px; display: none; padding: 15px; background: rgba(59, 130, 246, 0.05); border-left: 4px solid var(--primary-color); border-radius: 8px;">
+            <!-- Resultados aparecem aqui -->
+        </div>
+    </div>
+
+    <!-- Interface Visual do Mapa -->
+    <div class="form-container" style="flex: 2; min-width: 400px; padding: 0; background: transparent; border: none; box-shadow: none;">
+        <div id="routingMap" style="height: 520px; width: 100%; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-md); z-index: 1;"></div>
+    </div>
+</div>
+
+<!-- Modal Oculto para Selecionar Catálogo -->
+<div id="catalogModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(4px);">
+    <div style="background:var(--bg-card); padding:25px; border-radius:12px; border: 1px solid var(--border-color); width:90%; max-width:550px; box-shadow:var(--shadow-lg);">
+        <h3 style="color:var(--text-main); margin-bottom:5px;"><i class="fa-solid fa-book-bookmark"></i> Book de Endereços da Transportadora</h3>
+        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px;">Clique em uma filial ou cliente para espelhar nas caixas de rota instantaneamente.</p>
+        <div id="catalogList" style="max-height:350px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:10px;">
+            <!-- Renderizado em JS -->
+        </div>
+        <button type="button" class="btn-primary" onclick="document.getElementById('catalogModal').style.display='none'" style="margin-top: 20px; background:var(--danger); box-shadow:none;">Retroceder Manualmente</button>
+    </div>
+</div>
+
+<style>
+.map-tooltip { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); font-weight: 600; font-size: 0.9rem; border-radius:6px; box-shadow:var(--shadow-sm); }
+.auto-sugg { position: absolute; top: calc(100% - 2px); left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--border-color); border-top: 1px dashed var(--border-color); list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; z-index: 1000; display: none; box-shadow: var(--shadow-md); border-radius: 0 0 8px 8px; }
+.auto-sugg li { padding: 12px 15px; font-size: 0.9rem; color: var(--text-main); cursor: pointer; border-bottom: 1px solid var(--border-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display:flex; gap:10px; align-items:center; }
+.auto-sugg li i {color:var(--primary-color); opacity:0.8;}
+.auto-sugg li:last-child { border-bottom: none; }
+.auto-sugg li:hover { background: rgba(59, 130, 246, 0.1); font-weight:500;}
+.catalog-item { padding: 15px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; display: flex; align-items:center; gap:15px; transition: all 0.2s; }
+.catalog-item:hover { border-color: var(--primary-color); box-shadow: var(--shadow-sm); background: var(--bg-card); transform: scale(1.01); }
+.catalog-item i { color: var(--primary-color); font-size: 1.4rem; }
+.catalog-item strong { display: block; color: var(--text-main); font-size: 1.05rem; }
+.catalog-item span { display: block; color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
+
+/* Esconde o Itinerário (Quadrado Branco) do Leaflet Routing Machine pois os inputs e os relatórios oficiais desta tela são customizados */
+.leaflet-routing-container { display: none !important; }
+</style>

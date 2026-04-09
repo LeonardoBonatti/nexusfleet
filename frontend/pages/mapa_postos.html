@@ -1,0 +1,38 @@
+<!-- mapa_postos.html -->
+<div class="page-header">
+    <h2><i class="fa-solid fa-map-location-dot" style="color: var(--primary-color);"></i> Mapa de Postos (Radar Geográfico)</h2>
+    <p>Localize os postos parceiros com os melhores preços avaliados pela comunidade ao seu redor (Integrado via OpenStreetMap).</p>
+</div>
+
+<div class="form-container" style="max-width: 100%; padding: 0; overflow: hidden; background: transparent; border: none; box-shadow: none;">
+    <div id="fleetMap" style="height: 550px; width: 100%; border-radius: 12px; border: 1px solid var(--border-color); z-index: 1; box-shadow: var(--shadow-md);"></div>
+    <p style="margin-top: 15px; color: var(--text-muted); font-size: 0.9rem; text-align: right;"><i class="fa-solid fa-circle-info"></i> <b>Interativo:</b> Clique em qualquer rua do mapa para extrair o Radar de Captura para o seu formulário.</p>
+</div>
+
+<!-- CONTAINER ADICIONAR NOVO POSTO -->
+<div class="form-container" style="max-width: 100%; margin-top: 25px;">
+    <h3 style="margin-bottom: 20px; color: var(--text-main);"><i class="fa-solid fa-map-pin"></i> Descobrir Novo Posto</h3>
+    <form id="stationForm">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Nome / Bandeira</label>
+                <input type="text" name="name" placeholder="Ex: Shell (Campinas Centro)" required>
+            </div>
+            <div class="form-group">
+                <label>Preço Base Observado (R$ Gasolina)</label>
+                <input type="text" name="price" placeholder="Ex: 5,49" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group" style="opacity: 0.8;">
+                <label>Latitude (Clique no mapa)</label>
+                <input type="text" name="lat" id="formLat" placeholder="Ex: -22.7392" required readonly style="background: rgba(0,0,0,0.1);">
+            </div>
+            <div class="form-group" style="opacity: 0.8;">
+                <label>Longitude (Clique no mapa)</label>
+                <input type="text" name="lng" id="formLng" placeholder="Ex: -47.3314" required readonly style="background: rgba(0,0,0,0.1);">
+            </div>
+        </div>
+        <button type="submit" class="btn-primary" style="margin-top: 5px;"><i class="fa-solid fa-satellite-dish"></i> Adicionar ao Radar Coletivo</button>
+    </form>
+</div>
