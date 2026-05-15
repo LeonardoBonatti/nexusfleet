@@ -4,8 +4,7 @@
   "description": "Sistema de Controle de Combustível Nexus Fleet",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "postinstall": "npm rebuild sqlite3 --build-from-source"
+    "start": "node server.js"
   },
   "engines": {
     "node": "18.x"
