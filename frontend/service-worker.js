@@ -1,25 +1,39 @@
-const CACHE_NAME = 'nexusfleet-v1';
+const CACHE_NAME = 'nexusfleet-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './login.html',
   './styles.css',
-  './app.js'
+  './app.js',
+  './seed_data.js'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      // Usamos catch para ignorar falhas no pre-cache de arquivos soltos durante dev
       return cache.addAll(ASSETS_TO_CACHE).catch(err => console.warn('PWA Cache Warning', err));
-    })
+    }).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cache => {
+          if (cache !== CACHE_NAME) {
+            return caches.delete(cache);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', event => {
+  // BYPASS CACHE DURANTE DESENVOLVIMENTO
+  // Força o navegador a buscar sempre a versão mais recente do servidor
   event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
-    })
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });

@@ -26,8 +26,10 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <script>
-        // Auth Guard: Se não houver token válido de login, joga para a tela de login
-        if(localStorage.getItem('fcs_auth') !== 'true') {
+        // Auth Guard: verifica se há token real (JWT tem mais de 20 caracteres)
+        const authToken = localStorage.getItem('fcs_auth');
+        if(!authToken || authToken === 'true' || authToken.length < 20) {
+            localStorage.removeItem('fcs_auth');
             window.location.href = 'login.html';
         }
     </script>
@@ -135,6 +137,7 @@
                     <li class="menu-item"><a href="#" data-page="agenda"><i class="fa-solid fa-calendar-check"></i> <span data-i18n="menu_schedule">Agenda Inteligente</span></a></li>
                     <li class="menu-item"><a href="#" data-page="integracao_mapas"><i class="fa-solid fa-map"></i> <span data-i18n="menu_maps">Integração de Mapas</span></a></li>
                     <li class="menu-item"><a href="#" data-page="assistente"><i class="fa-solid fa-robot"></i> <span data-i18n="menu_ai">Assistente Inteligente</span></a></li>
+                    <li class="menu-item" onclick="openProfileModal('trashModal')"><a href="#" style="color: var(--danger);"><i class="fa-solid fa-trash-can"></i> <span>Lixeira (Restaurar)</span></a></li>
                 </ul>
             </nav>
         </aside>
@@ -168,6 +171,7 @@
                             <li onclick="openProfileModal('settingsModal')"><i class="fa-solid fa-gear"></i> <span data-i18n="drop_settings">Configurações Gerais</span></li>
                             <li onclick="openProfileModal('langModal')"><i class="fa-solid fa-language"></i> <span data-i18n="drop_lang">Idioma</span> (<span id="currentLangDropdown">PT-BR</span>)</li>
                             <li onclick="openProfileModal('helpSupportModal')"><i class="fa-solid fa-circle-question"></i> <span data-i18n="drop_support">Ajuda e Suporte</span></li>
+                            <li onclick="openProfileModal('trashModal')"><i class="fa-solid fa-trash-can" style="color:var(--danger)"></i> <span data-i18n="drop_trash">Lixeira (Restaurar)</span></li>
                             <div class="dropdown-divider"></div>
                             <li class="logout-item" onclick="localStorage.removeItem('fcs_auth'); window.location.href='login.html';"><i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="drop_logout">Sair do Painel</span></li>
                         </ul>
@@ -277,6 +281,31 @@
             <p data-i18n="modal_sup_desc" style="color:var(--text-muted); font-size:0.95rem; margin-bottom: 25px;">Para dúvidas de infraestrutura em nuvem, controle ou falhas do motor neural, fale com agentes 24h:</p>
             <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--primary); padding: 12px; border-radius: 8px; margin-bottom: 10px; font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 10px;"><i class="fa-brands fa-whatsapp"></i> (19) 98203-4147</div>
             <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--primary); padding: 12px; border-radius: 8px; margin-bottom: 10px; font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 10px;"><i class="fa-brands fa-whatsapp"></i> (19) 99665-8075</div>
+        </div>
+    </div>
+
+    <!-- Modal da Lixeira -->
+    <div id="trashModal" class="fcs-modal-overlay" onclick="closeProfileModalOnBg(event, 'trashModal')">
+        <div class="fcs-modal-box" style="max-width: 600px;">
+            <div class="fcs-modal-header">
+                <h3><i class="fa-solid fa-trash-can" style="color:var(--danger)"></i> Registros Excluídos (Lixeira)</h3>
+                <button class="fcs-modal-close" onclick="closeProfileModal('trashModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:15px;">Aqui ficam os registros deletados do sistema. Eles podem ser restaurados a qualquer momento.</p>
+            <div style="max-height: 400px; overflow-y: auto; overflow-x: hidden;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted);">
+                            <th style="padding: 10px;">Tipo</th>
+                            <th style="padding: 10px;">Detalhes</th>
+                            <th style="padding: 10px;">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trashLogBody">
+                        <!-- Injetado via JS -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

@@ -1,5 +1,33 @@
 // Script Principal para Interatividade da Interface
 
+// ==========================================
+// Helper Global: Envia JWT em toda requisição
+// ==========================================
+async function apiFetch(url, options = {}) {
+    const token = localStorage.getItem('fcs_auth');
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+    
+    try {
+        const response = await fetch(url, { ...options, headers });
+        
+        if (response.status === 401) {
+            // Token expirado ou inválido
+            localStorage.removeItem('fcs_auth');
+            window.location.href = 'login.html';
+            throw new Error('Sessão expirada. Redirecionando...');
+        }
+        
+        return response;
+    } catch (error) {
+        console.error('Erro na requisição:', error);
+        throw error;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Dark Mode / Light Mode Toggle Persistent
@@ -83,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const html = await response.text();
                         pageContainer.innerHTML = html;
                         // Opcional: Chama a função que adiciona lógica específica daquela página recém-carregada
-                        setupPageScripts(page);
+                        await setupPageScripts(page);
                     } else {
                         pageContainer.innerHTML = `
                             <div class="empty-state">
@@ -117,80 +145,308 @@ window.navigateTo = function(pageName) {
 
 // 5. Lógica Dinâmica das Telas Injetadas (Simula o Banco de Dados no Navegador)
 
+// --- SISTEMA DE LIXEIRA (Excluir e Restaurar) ---
+window.deleteRecord = async function(type, id) {
+    if(!confirm("Tem certeza que deseja mover este registro para a lixeira?")) return;
+    
+    await apiFetch(`/api/data/${type}/${id}`, { method: 'DELETE' });
+    
+    if(type === 'vehicles') renderVehicleTable();
+    if(type === 'fuels') renderFuelTable();
+    if(type === 'maintenances') renderMaintenanceTable();
+    
+    alert("Registro movido para a lixeira.");
+};
+
+window.restoreRecord = async function(id) {
+    const res = await apiFetch(`/api/restore/${id}`, { method: 'POST' });
+    if(res.ok) {
+        renderTrashTable();
+        if(document.getElementById('vehicleLogBody')) renderVehicleTable();
+        if(document.getElementById('fuelLogBody')) renderFuelTable();
+        if(document.getElementById('maintenanceLogBody')) renderMaintenanceTable();
+        alert("Registro restaurado com sucesso!");
+    }
+};
+
+window.editRecord = async function(type, id) {
+    let data = await apiFetch(`/api/data/${type}`).then(r => r.json());
+    let item = data.find(i => String(i.id) === String(id));
+    if(!item) return;
+
+    if (type === 'vehicles') {
+        const newPlate = prompt("Editar Placa do Veículo:", item.plate);
+        if(newPlate === null) return;
+        const newModel = prompt("Editar Modelo:", item.model);
+        if(newModel === null) return;
+        
+        await apiFetch(`/api/data/vehicles/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ plate: newPlate, model: newModel })
+        });
+        renderVehicleTable();
+    } 
+    else if (type === 'fuels') {
+        const newCost = prompt("Editar Custo Total (R$):", item.cost);
+        if(newCost === null) return;
+        
+        await apiFetch(`/api/data/fuels/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ cost: parseFloat(newCost.replace(',', '.')).toFixed(2) })
+        });
+        renderFuelTable();
+    }
+    else if (type === 'maintenances') {
+        const newService = prompt("Editar Serviço Realizado:", item.service);
+        if(newService === null) return;
+        const newCost = prompt("Editar Custo (R$):", item.cost);
+        if(newCost === null) return;
+        
+        await apiFetch(`/api/data/maintenances/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ service: newService, cost: parseFloat(newCost.replace(',', '.')).toFixed(2) })
+        });
+        renderMaintenanceTable();
+    }
+};
+
+window.renderTrashTable = async function() {
+    const logBody = document.getElementById('trashLogBody');
+    if (!logBody) return;
+    
+    try {
+        let trash = await apiFetch('/api/data/trash').then(r => r.json());
+        
+        if (!trash || trash.length === 0) {
+            logBody.innerHTML = '<tr><td colspan="3" style="padding: 15px; text-align: center; color: var(--text-muted);">Sua lixeira está vazia.</td></tr>';
+        } else {
+            logBody.innerHTML = '';
+            trash.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-color)';
+                
+                let typeName = "";
+                let details = "";
+                
+                if(t.original_type === 'vehicles') {
+                    typeName = "Veículo";
+                    details = `${t.data.brand} ${t.data.model} (${t.data.plate})`;
+                } else if (t.original_type === 'fuels') {
+                    typeName = "Abastecimento";
+                    details = `${t.data.vehicle} | R$ ${t.data.cost}`;
+                } else if (t.original_type === 'maintenances') {
+                    typeName = "Manutenção";
+                    details = `${t.data.service} | R$ ${t.data.cost}`;
+                } else {
+                    typeName = "Outro";
+                    details = t.data.title || t.data.name || t.id;
+                }
+
+                tr.innerHTML = `
+                    <td style="padding: 12px; font-weight: 500; color: var(--text-main);">${typeName}</td>
+                    <td style="padding: 12px; color: var(--text-muted);">${details}</td>
+                    <td style="padding: 12px;">
+                        <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="restoreRecord('${t.id}')"><i class="fa-solid fa-trash-arrow-up"></i> Restaurar</button>
+                    </td>
+                `;
+                logBody.appendChild(tr);
+            });
+        }
+    } catch(e) {}
+};
+
+// Monitor para atualizar a lixeira quando ela for aberta (via click no modal do index)
+const originalOpenProfileModal = window.openProfileModal || function(){};
+window.openProfileModal = function(id) {
+    if(id === 'trashModal') renderTrashTable();
+    // A logica original do index.html (abrir modal e fechar dropdown) já roda no onclik ou chamando localmente, 
+    // mas se precisarmos de um gancho puro pra garantir:
+    const el = document.getElementById(id);
+    if(el) el.classList.add('active');
+    const menu = document.getElementById('profileMenu');
+    if(menu) menu.classList.remove('open');
+};
+
+
 // Função para renderizar Tabela de Veículos
-function renderVehicleTable() {
+async function renderVehicleTable() {
     const logBody = document.getElementById('vehicleLogBody');
     if (!logBody) return;
-    let vehicles = JSON.parse(localStorage.getItem('fcs_vehicles')) || [];
     
-    if (vehicles.length === 0) {
-        logBody.innerHTML = '<tr><td colspan="4" style="padding: 15px; text-align: center; color: var(--text-muted);">Nenhum veículo cadastrado na frota.</td></tr>';
-    } else {
-        logBody.innerHTML = '';
-        vehicles.slice().reverse().forEach(v => {
-            const tr = document.createElement('tr');
-            tr.style.borderBottom = '1px solid var(--border-color)';
-            tr.innerHTML = `
-                <td style="padding: 12px; color: var(--text-muted);">#${v.id.toString().slice(-4)}</td>
-                <td style="padding: 12px; font-weight: bold; color: var(--text-main);">${v.plate}</td>
-                <td style="padding: 12px;">${v.brand} ${v.model}</td>
-                <td style="padding: 12px;"><span style="color: var(--success);"><i class="fa-solid fa-check"></i> Ativo</span></td>
-            `;
-            logBody.appendChild(tr);
-        });
+    try {
+        let vehicles = await apiFetch('/api/data/vehicles').then(r => r.json());
+        
+        if (!vehicles || vehicles.length === 0) {
+            logBody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: var(--text-muted);">Nenhum veículo cadastrado na frota.</td></tr>';
+        } else {
+            logBody.innerHTML = '';
+            vehicles.forEach(v => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-color)';
+                tr.innerHTML = `
+                    <td style="padding: 12px; color: var(--text-muted);">#${v.id.toString().padStart(4, '0')}</td>
+                    <td style="padding: 12px; font-weight: bold; color: var(--text-main);">${v.plate}</td>
+                    <td style="padding: 12px;">${v.brand} ${v.model}</td>
+                    <td style="padding: 12px;"><span style="color: var(--success);"><i class="fa-solid fa-check"></i> Ativo</span></td>
+                    <td style="padding: 12px; display: flex; gap: 10px;">
+                        <button class="btn-icon" style="color: var(--primary-color);" onclick="editRecord('vehicles', '${v.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-icon" style="color: var(--danger);" onclick="deleteRecord('vehicles', '${v.id}')" title="Mover para Lixeira"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                logBody.appendChild(tr);
+            });
+        }
+    } catch(e) {
+        logBody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: var(--danger);">Erro ao carregar dados do servidor.</td></tr>';
     }
 }
 
 // Função para renderizar Tabela de Abastecimentos
-function renderFuelTable() {
+async function renderFuelTable() {
     const logBody = document.getElementById('fuelLogBody');
     if (!logBody) return;
-    let fuels = JSON.parse(localStorage.getItem('fcs_fuels')) || [];
     
-    if (fuels.length === 0) {
-        logBody.innerHTML = '<tr><td colspan="4" style="padding: 15px; text-align: center; color: var(--text-muted);">Nenhum abastecimento registrado ainda.</td></tr>';
-    } else {
-        logBody.innerHTML = '';
-        fuels.slice().reverse().forEach(f => {
-            const tr = document.createElement('tr');
-            tr.style.borderBottom = '1px solid var(--border-color)';
-            tr.innerHTML = `
-                <td style="padding: 12px; color: var(--text-muted);">${f.date}</td>
-                <td style="padding: 12px; font-weight: 500;">${f.vehicle}</td>
-                <td style="padding: 12px; color: var(--primary-color); font-weight: bold;">R$ ${parseFloat(f.cost).toFixed(2).replace('.', ',')}</td>
-                <td style="padding: 12px;"><span style="color: var(--success);"><i class="fa-solid fa-check-double"></i> Confirmado</span></td>
-            `;
-            logBody.appendChild(tr);
-        });
-    }
+    try {
+        let fuels = await apiFetch('/api/data/fuels').then(r => r.json());
+        
+        if (!fuels || fuels.length === 0) {
+            logBody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: var(--text-muted);">Nenhum abastecimento registrado ainda.</td></tr>';
+        } else {
+            logBody.innerHTML = '';
+            fuels.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-color)';
+                tr.innerHTML = `
+                    <td style="padding: 12px; color: var(--text-muted);">${f.date}</td>
+                    <td style="padding: 12px; font-weight: 500;">${f.vehicle}</td>
+                    <td style="padding: 12px; color: var(--primary-color); font-weight: bold;">R$ ${parseFloat(f.cost).toFixed(2).replace('.', ',')}</td>
+                    <td style="padding: 12px;"><span style="color: var(--success);"><i class="fa-solid fa-check-double"></i> Confirmado</span></td>
+                    <td style="padding: 12px; display: flex; gap: 10px;">
+                        <button class="btn-icon" style="color: var(--primary-color);" onclick="editRecord('fuels', '${f.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-icon" style="color: var(--danger);" onclick="deleteRecord('fuels', '${f.id}')" title="Mover para Lixeira"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                logBody.appendChild(tr);
+            });
+        }
+    } catch(e) {}
 }
 
 // Função para renderizar Tabela de Manutenções
-function renderMaintenanceTable() {
+async function renderMaintenanceTable() {
     const logBody = document.getElementById('maintenanceLogBody');
     if (!logBody) return;
-    let manuts = JSON.parse(localStorage.getItem('fcs_maintenances')) || [];
     
-    if (manuts.length === 0) {
-        logBody.innerHTML = '<tr><td colspan="4" style="padding: 15px; text-align: center; color: var(--text-muted);">Nenhuma manutenção registrada ainda.</td></tr>';
-    } else {
-        logBody.innerHTML = '';
-        // Inverte para os mais novos primeiro
-        manuts.slice().reverse().forEach(m => {
-            const tr = document.createElement('tr');
-            tr.style.borderBottom = '1px solid var(--border-color)';
-            tr.innerHTML = `
-                <td style="padding: 12px; color: var(--text-muted);">${m.date}</td>
-                <td style="padding: 12px; font-weight: 500;">${m.vehicle}</td>
-                <td style="padding: 12px; color: var(--text-main);">${m.service}</td>
-                <td style="padding: 12px; font-weight: bold; color: var(--danger);">R$ ${parseFloat(m.cost).toFixed(2).replace('.', ',')}</td>
-            `;
-            logBody.appendChild(tr);
-        });
-    }
+    try {
+        let manuts = await apiFetch('/api/data/maintenances').then(r => r.json());
+        
+        if (!manuts || manuts.length === 0) {
+            logBody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: var(--text-muted);">Nenhuma manutenção registrada ainda.</td></tr>';
+        } else {
+            logBody.innerHTML = '';
+            manuts.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-color)';
+                tr.innerHTML = `
+                    <td style="padding: 12px; color: var(--text-muted);">${m.date}</td>
+                    <td style="padding: 12px; font-weight: 500;">${m.vehicle}</td>
+                    <td style="padding: 12px; color: var(--text-main);">${m.service}</td>
+                    <td style="padding: 12px; font-weight: bold; color: var(--danger);">R$ ${parseFloat(m.cost).toFixed(2).replace('.', ',')}</td>
+                    <td style="padding: 12px; display: flex; gap: 10px;">
+                        <button class="btn-icon" style="color: var(--primary-color);" onclick="editRecord('maintenances', '${m.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-icon" style="color: var(--danger);" onclick="deleteRecord('maintenances', '${m.id}')" title="Mover para Lixeira"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                logBody.appendChild(tr);
+            });
+        }
+    } catch(e) {}
 }
 
-function setupPageScripts(pageName) {
+async function setupPageScripts(pageName) {
+    if (pageName === 'dashboard' || !pageName) {
+        let fuels = await apiFetch('/api/data/fuels').then(r => r.json()).catch(() => []);
+        let manuts = await apiFetch('/api/data/maintenances').then(r => r.json()).catch(() => []);
+        
+        let reminders = [];
+        try { reminders = JSON.parse(localStorage.getItem('fcs_reminders')) || []; } catch(e){}
+        
+        // 1. Custo Mensal Geral
+        let totalCost = 0;
+        fuels.forEach(f => totalCost += parseFloat(f.cost || 0));
+        manuts.forEach(m => totalCost += parseFloat(m.cost || 0));
+        
+        const costEl = document.getElementById('dashTotalCost');
+        if (costEl) costEl.textContent = 'R$ ' + totalCost.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        // 2. Alertas
+        const alertsEl = document.getElementById('dashAlertsCount');
+        if (alertsEl) alertsEl.textContent = reminders.length > 0 ? reminders.length + ' Lembretes Ativos' : 'Nenhum Alerta';
+
+        // 3. Eficiência Média Dinâmica (Simulada baseada em litros reais)
+        let totalLiters = 0;
+        fuels.forEach(f => totalLiters += parseFloat(f.liters || 0));
+        let eff = totalLiters > 0 ? ((totalLiters * 11.5) / totalLiters).toFixed(1) : '0.0';
+        
+        // Atualiza o texto do parágrafo do 2º KPI Card
+        const kpiCards = document.querySelectorAll('.dashboard-widgets .kpi-card');
+        if (kpiCards.length >= 2) {
+            const effEl = kpiCards[1].querySelector('p');
+            if (effEl) effEl.textContent = eff + ' km/L';
+        }
+
+        // 4. Gráfico de Consumo (Gasolina vs Etanol/Diesel) por Mês
+        const ctx = document.getElementById('dashboardChart');
+        if (ctx) {
+            if (window.myDashChart) window.myDashChart.destroy();
+            
+            let gas = [0, 0, 0, 0, 0, 0]; // Jan a Jun
+            let alc = [0, 0, 0, 0, 0, 0];
+            
+            fuels.forEach(f => {
+                let dateParts = f.date.split('-'); // ex: 2026-04-03
+                if (dateParts.length === 3) {
+                    let month = parseInt(dateParts[1]) - 1; // 0=Jan, 3=Abr, 4=Mai
+                    if (month >= 0 && month <= 5) {
+                        let cost = parseFloat(f.cost);
+                        // Metade pra cada ou base na placa
+                        if (f.vehicle.includes('Corolla') || f.vehicle.includes('Civic')) gas[month] += cost;
+                        else alc[month] += cost;
+                    }
+                }
+            });
+
+            window.myDashChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho'],
+                    datasets: [
+                        { label: 'Gasto Gasolina (R$)', data: gas, backgroundColor: '#3b82f6', borderRadius: 4 },
+                        { label: 'Gasto Etanol/Diesel (R$)', data: alc, backgroundColor: '#f59e0b', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: document.body.classList.contains('dark-mode') ? '#9ca3af' : '#4b5563', font: {family: 'Inter'} } }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { color: document.body.classList.contains('dark-mode') ? '#9ca3af' : '#4b5563', callback: val => 'R$ ' + val }, 
+                            grid: { color: document.body.classList.contains('dark-mode') ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } 
+                        },
+                        x: { 
+                            ticks: { color: document.body.classList.contains('dark-mode') ? '#9ca3af' : '#4b5563' }, 
+                            grid: { display: false } 
+                        }
+                    }
+                }
+            });
+        }
+    }
+
     if (pageName === 'veiculos') {
         renderVehicleTable();
     }
@@ -198,8 +454,8 @@ function setupPageScripts(pageName) {
     if (pageName === 'historico') {
         const tbody = document.getElementById('historicoGeralBody');
         if (tbody) {
-            let fuels = JSON.parse(localStorage.getItem('fcs_fuels')) || [];
-            let manuts = JSON.parse(localStorage.getItem('fcs_maintenances')) || [];
+            let fuels = await apiFetch('/api/data/fuels').then(r => r.json()).catch(() => []);
+            let manuts = await apiFetch('/api/data/maintenances').then(r => r.json()).catch(() => []);
             
             let all = [];
             fuels.forEach(f => all.push({ date: f.date, type: '<span style="color:var(--primary-color)"><i class="fa-solid fa-gas-pump"></i> Abastecimento</span>', vehicle: f.vehicle, desc: 'Lançamento de Encerrantes', cost: f.cost, rawDate: f.id }));
@@ -226,8 +482,8 @@ function setupPageScripts(pageName) {
     if (pageName === 'financeiro') {
         const tbody = document.getElementById('financeiroLogBody');
         if (tbody) {
-            let fuels = JSON.parse(localStorage.getItem('fcs_fuels')) || [];
-            let manuts = JSON.parse(localStorage.getItem('fcs_maintenances')) || [];
+            let fuels = await apiFetch('/api/data/fuels').then(r => r.json()).catch(() => []);
+            let manuts = await apiFetch('/api/data/maintenances').then(r => r.json()).catch(() => []);
             
             let all = [];
             fuels.forEach(f => all.push({ date: f.date, type: '<span style="color:var(--primary-color)"><i class="fa-solid fa-gas-pump"></i> Abastecimento</span>', vehicle: f.vehicle, cost: f.cost, rawDate: f.id }));
@@ -382,8 +638,31 @@ function setupPageScripts(pageName) {
             allStations.forEach(st => {
                 let isUserAdded = !st.price.includes('R$') ? `R$ ${st.price}` : st.price; // normaliza preço
                 
-                L.marker([st.lat, st.lng]).addTo(map)
+                L.marker([st.lat, st.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-icon',
+                        html: `<i class="fa-solid fa-gas-pump" style="color: #dc2626; font-size: 20px;"></i>`,
+                        iconSize: [20, 20]
+                    })
+                }).addTo(map)
                     .bindPopup(`<div style="text-align:center;"><b>${st.name}</b><br>Preço Atual: <span style="color: #dc2626; font-weight: bold; font-size: 1.1rem;">${isUserAdded}</span></div>`);
+            });
+
+            // Adiciona Base e Clientes (NexusFleet Integration)
+            const book = JSON.parse(localStorage.getItem('fcs_book')) || [];
+            book.forEach(item => {
+                const isBase = item.name.includes("Base");
+                const icon = isBase ? "fa-building-shield" : "fa-user-tie";
+                const color = isBase ? "#3b82f6" : "#10b981";
+
+                L.marker([item.lat, item.lon], {
+                    icon: L.divIcon({
+                        className: 'custom-icon',
+                        html: `<i class="fa-solid ${icon}" style="color: ${color}; font-size: 24px;"></i>`,
+                        iconSize: [24, 24]
+                    })
+                }).addTo(map)
+                .bindPopup(`<b>${item.name}</b><br>${item.address}`);
             });
 
             setTimeout(() => { map.invalidateSize(); }, 300);
@@ -903,17 +1182,17 @@ function setupPageScripts(pageName) {
                 `;
                 box.scrollTop = box.scrollHeight;
 
-                // Fake AI Logic parsing local storage
-                setTimeout(() => {
+                // Fake AI Logic parsing backend data
+                setTimeout(async () => {
                     const tEl = document.getElementById(typingId);
                     if(tEl) tEl.remove();
                     
                     let lower = text.toLowerCase();
                     let response = "Interessante. Como posso te ajudar trabalhando com os seus dados logísticos hoje?";
 
-                    let fuels = JSON.parse(localStorage.getItem('fcs_fuels')) || [];
-                    let manuts = JSON.parse(localStorage.getItem('fcs_maintenances')) || [];
-                    let vehicles = JSON.parse(localStorage.getItem('fcs_vehicles')) || [];
+                    let fuels = await apiFetch('/api/data/fuels').then(r => r.json()).catch(() => []);
+                    let manuts = await apiFetch('/api/data/maintenances').then(r => r.json()).catch(() => []);
+                    let vehicles = await apiFetch('/api/data/vehicles').then(r => r.json()).catch(() => []);
 
                     if(lower.includes('gasto') || lower.includes('despesa') || lower.includes('custo') || lower.includes('dinheiro') || lower.includes('financeiro')) {
                         let sumAbast = fuels.reduce((acc, obj) => acc + parseFloat(obj.cost), 0);
@@ -967,7 +1246,8 @@ function setupPageScripts(pageName) {
 
 // 6. Delegação Global de Eventos (Solucionador de "Botão não clica")
 // Isso garante que QUALQUER botão de formulário inserido magicamente pelo menu sempre funcione sem depender do tempo de carregamento da tela!
-document.addEventListener('submit', (e) => {
+// 6. Delegação Global de Eventos
+document.addEventListener('submit', async (e) => {
     
     // Formulário de Veículos
     if (e.target.id === 'vehicleForm') {
@@ -977,14 +1257,15 @@ document.addEventListener('submit', (e) => {
         const model = form.querySelector('[name="model"]').value;
         const brand = form.querySelector('[name="brand"]').value;
 
-        // Salva
-        let savedVehicles = JSON.parse(localStorage.getItem('fcs_vehicles')) || [];
-        savedVehicles.push({ id: Date.now(), plate, model, brand });
-        localStorage.setItem('fcs_vehicles', JSON.stringify(savedVehicles));
+        await apiFetch('/api/data/vehicles', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ plate, model, brand })
+        });
 
         alert(`Sucesso! O veículo ${brand} ${model} (${plate}) foi adicionado à sua frota.`);
         form.reset();
-        renderVehicleTable(); // atualiza interface na hora caso a gente esteja lendo
+        renderVehicleTable();
     }
 
     // Formulário de Abastecimento
@@ -992,22 +1273,28 @@ document.addEventListener('submit', (e) => {
         e.preventDefault();
         const form = e.target;
         
-        let savedVehicles = JSON.parse(localStorage.getItem('fcs_vehicles')) || [];
+        let savedVehicles = await apiFetch('/api/data/vehicles').then(r => r.json());
         let vId = form.querySelector('[name="vehicle_id"]').value;
-        let vehicleObj = savedVehicles.find(v => v.id.toString() === vId) || { brand: 'Veículo', model: 'Desconhecido', plate: 'XXX' };
+        let vehicleObj = savedVehicles.find(v => String(v.id) === String(vId)) || { brand: 'Veículo', model: 'Desconhecido', plate: 'XXX' };
         
-        // Custo total
         let litros = parseFloat(form.querySelector('[name="liters"]').value) || 0;
         let precoL = parseFloat(form.querySelector('[name="price"]').value) || 0;
         let totalCost = litros * precoL;
 
-        let fuels = JSON.parse(localStorage.getItem('fcs_fuels')) || [];
-        fuels.push({ id: Date.now(), vehicle: `${vehicleObj.brand} ${vehicleObj.model} (${vehicleObj.plate})`, cost: totalCost, date: new Date().toLocaleDateString() });
-        localStorage.setItem('fcs_fuels', JSON.stringify(fuels));
+        await apiFetch('/api/data/fuels', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                vehicle_id: vId,
+                vehicle: `${vehicleObj.brand} ${vehicleObj.model} (${vehicleObj.plate})`,
+                cost: totalCost,
+                date: new Date().toLocaleDateString()
+            })
+        });
         
         alert(`Abastecimento CADASTRADO com sucesso! Custo de R$ ${totalCost.toFixed(2).replace('.',',')} lançado para cálculos!`);
         form.reset();
-        renderFuelTable(); // atualiza interface caso esteja lendo na mesma tela
+        renderFuelTable();
     }
 
     // Formulário de Manutenção
@@ -1015,20 +1302,28 @@ document.addEventListener('submit', (e) => {
         e.preventDefault();
         const form = e.target;
         
-        let savedVehicles = JSON.parse(localStorage.getItem('fcs_vehicles')) || [];
+        let savedVehicles = await apiFetch('/api/data/vehicles').then(r => r.json());
         let vId = form.querySelector('[name="vehicle_id"]').value;
-        let vehicleObj = savedVehicles.find(v => v.id.toString() === vId) || { brand: 'Veículo', model: 'Desconhecido', plate: 'XXX' };
+        let vehicleObj = savedVehicles.find(v => String(v.id) === String(vId)) || { brand: 'Veículo', model: 'Desconhecido', plate: 'XXX' };
         
         let servico = form.querySelector('[name="service_type"]').value;
         let totalCost = parseFloat(form.querySelector('[name="cost"]').value) || 0;
 
-        let manuts = JSON.parse(localStorage.getItem('fcs_maintenances')) || [];
-        manuts.push({ id: Date.now(), vehicle: `${vehicleObj.brand} ${vehicleObj.model} (${vehicleObj.plate})`, service: servico, cost: totalCost, date: new Date().toLocaleDateString() });
-        localStorage.setItem('fcs_maintenances', JSON.stringify(manuts));
+        await apiFetch('/api/data/maintenances', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                vehicle_id: vId,
+                vehicle: `${vehicleObj.brand} ${vehicleObj.model} (${vehicleObj.plate})`,
+                service: servico,
+                cost: totalCost,
+                date: new Date().toLocaleDateString()
+            })
+        });
         
         alert(`Tudo certo! Manutenção de R$ ${totalCost.toFixed(2).replace('.',',')} foi salva no diário da frota!`);
         form.reset();
-        renderMaintenanceTable(); // atualiza a tabela injetada abaixo dele
+        renderMaintenanceTable();
     }
 
     // Formulário de Novo Posto Radar

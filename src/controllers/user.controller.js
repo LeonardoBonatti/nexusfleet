@@ -1,4 +1,4 @@
-const Object = require('express');
+// UserController
 const userService = require('../services/user.service');
 
 /**

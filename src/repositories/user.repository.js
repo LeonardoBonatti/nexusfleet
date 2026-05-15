@@ -1,30 +1,33 @@
-const BaseRepository = require('./base.repository');
+const db = require('../sqlite');
 
 /**
  * UserRepository
- * Responsável pela comunicação direta com a tabela 'users' no banco de dados.
+ * Responsável pela comunicação com a tabela 'users' usando SQLite.
  */
-class UserRepository extends BaseRepository {
-    constructor() {
-        super('users');
+class UserRepository {
+    // Busca um usuário pelo email
+    findByEmail(email) {
+        return new Promise((resolve, reject) => {
+            db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, row) => {
+                if (err) reject(err);
+                else resolve(row || null);
+            });
+        });
     }
 
-    async findByEmail(email) {
-        const result = await this.db.query(`SELECT * FROM ${this.tableName} WHERE email = $1`, [email]);
-        return result.rows[0];
-    }
-
-    async create(userData) {
-        const query = `
-            INSERT INTO users (name, email, password_hash, role)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, name, email, role, created_at
-        `;
-        const params = [userData.name, userData.email, userData.password_hash, userData.role];
-        const result = await this.db.query(query, params);
-        return result.rows[0];
+    // Cria um novo usuário
+    create(userData) {
+        return new Promise((resolve, reject) => {
+            db.run(
+                `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)`,
+                [userData.name, userData.email, userData.password_hash, userData.role || 'user'],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve({ id: this.lastID, name: userData.name, email: userData.email, role: userData.role });
+                }
+            );
+        });
     }
 }
 
-// Exporta uma instância única (Singleton)
 module.exports = new UserRepository();
