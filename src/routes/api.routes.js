@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../database/sqlite');
+const db = require('../db_service/sqlite.js');
 const jwt = require('jsonwebtoken');
 
 // ==========================================

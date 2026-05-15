@@ -1,4 +1,4 @@
-const db = require('../sqlite');
+const db = require('../db_service/sqlite.js');
 
 /**
  * UserRepository
