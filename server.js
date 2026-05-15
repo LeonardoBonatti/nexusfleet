@@ -34,6 +34,10 @@ app.get('/api/status', (req, res) => {
 const apiRoutes = require('./src/routes/api.routes');
 app.use('/api', apiRoutes);
 
+// Importação das Rotas de Usuários (Login/Register)
+const userRoutes = require('./src/routes/user.routes');
+app.use('/api/users', userRoutes);
+
 // Força acesso na rota raiz (/) a retornar o HTML principal
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
