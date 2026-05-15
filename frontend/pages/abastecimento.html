@@ -1,68 +1,160 @@
 <!-- abastecimento.html -->
 <div class="page-header">
     <h2><i class="fa-solid fa-gas-pump" style="color: var(--primary-color);"></i> Registro de Abastecimento</h2>
-    <p>Adicione novos abastecimentos em tempo real para cálculos automáticos de eficiência baseados no odômetro do veículo.</p>
+    <p>Adicione abastecimentos em tempo real. O sistema valida o volume máximo do tanque e o horímetro sequencial.</p>
 </div>
 
 <div class="form-container">
     <form id="fuelRecordForm">
         <div class="form-group">
             <label><i class="fa-solid fa-car"></i> Veículo da Frota</label>
-            <select name="vehicle_id" required>
+            <select name="vehicle_id" id="fuelVehicleSelect" required onchange="onVehicleChangeFuel(this)">
                 <option value="">Selecione o veículo utilizado...</option>
-                <option value="1">Volkswagen Gol 1.0 (Placa: ABC-1234)</option>
-                <option value="2">Fiat Toro Diesel (Placa: XYZ-9876)</option>
             </select>
+            <small id="fuelTankHint" style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px; display:block;"></small>
         </div>
         
         <div class="form-row">
             <div class="form-group">
                 <label><i class="fa-solid fa-droplet"></i> Tipo de Combustível</label>
                 <select name="fuel_type" required>
-                    <option value="Gasolina">Gasolina Comum</option>
+                    <option value="Gasolina Comum">Gasolina Comum</option>
                     <option value="Gasolina Aditivada">Gasolina Aditivada</option>
-                    <option value="Álcool">Etanol (Álcool)</option>
-                    <option value="Diesel">Diesel S10</option>
+                    <option value="Álcool Comum">Álcool / Etanol Comum</option>
+                    <option value="Álcool Aditivado">Álcool / Etanol Aditivado</option>
+                    <option value="Diesel S10">Diesel S10</option>
+                    <option value="Diesel S500">Diesel S500 (Comum)</option>
+                    <option value="Diesel Aditivado">Diesel Aditivado</option>
+                    <option value="GNV">GNV (Gás Natural Veicular)</option>
                 </select>
             </div>
             <div class="form-group">
                 <label><i class="fa-solid fa-flask"></i> Volume Abastecido (Litros)</label>
-                <input type="number" step="0.01" name="liters" placeholder="Ex: 40.50 Litros" required>
+                <input type="number" step="0.01" name="liters" id="fuelLitersInput" placeholder="Ex: 40.50" min="0.1" required oninput="validateFuelLiters()">
+                <small id="litersHint" style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px; display:block;"></small>
             </div>
         </div>
 
         <div class="form-row">
             <div class="form-group">
                 <label><i class="fa-solid fa-money-bill-wave"></i> Preço por Litro (R$)</label>
-                <input type="number" step="0.01" name="price" placeholder="Ex: 5.89" required>
+                <input type="number" step="0.001" name="price_per_liter" id="pricePerLiter" placeholder="Ex: 5.890" min="0.01" required oninput="calcFuelTotal()">
             </div>
             <div class="form-group">
-                <label><i class="fa-solid fa-gauge-high"></i> Hodômetro Atual (km)</label>
-                <input type="number" step="0.1" name="odometer" placeholder="Ex: 15400.5 km" required>
+                <label><i class="fa-solid fa-circle-dollar-to-slot"></i> Custo Total (R$) <span style="color:var(--text-muted); font-size:0.8em;">(calculado)</span></label>
+                <input type="number" step="0.01" name="cost" id="fuelCostTotal" placeholder="Calculado automaticamente" readonly style="background: rgba(0,0,0,0.05); cursor:not-allowed;">
             </div>
         </div>
 
-        <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Confirmar Lançamento Seguro</button>
+        <div class="form-row">
+            <div class="form-group">
+                <label><i class="fa-solid fa-gauge-high"></i> Hodômetro Atual (km)</label>
+                <input type="number" step="0.1" name="odometer" placeholder="Ex: 15400.5 km" min="0">
+            </div>
+            <div class="form-group">
+                <label><i class="fa-solid fa-clock-rotate-left"></i> Horímetro Atual (h) <span style="color:var(--text-muted); font-size:0.8em;">(opcional)</span></label>
+                <input type="number" step="0.1" name="horimeter" id="horimeterInput" placeholder="Ex: 2350.5 h" min="0" oninput="validateHorimeter()">
+                <small id="horimeterHint" style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px; display:block;"></small>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Confirmar Lançamento</button>
     </form>
 </div>
 
-<!-- CONTAINER DE HISTORICO DE ABASTECIMENTOS -->
+<!-- HISTORICO DE ABASTECIMENTOS -->
 <div class="form-container" style="max-width: 100%; margin-top: 30px;">
-    <h3 style="margin-bottom: 15px; color: var(--text-main);"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Enchimentos</h3>
+    <h3 style="margin-bottom: 15px; color: var(--text-main);"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Abastecimentos</h3>
     <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead>
                 <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted);">
-                    <th style="padding: 10px;">Data do Custo</th>
-                    <th style="padding: 10px;">Veículo Relacionado</th>
-                    <th style="padding: 10px;">Custo Despendido (R$)</th>
-                    <th style="padding: 10px;">Comprovação</th>
+                    <th style="padding: 10px;">Data</th>
+                    <th style="padding: 10px;">Veículo</th>
+                    <th style="padding: 10px;">Combustível</th>
+                    <th style="padding: 10px;">Litros</th>
+                    <th style="padding: 10px;">Horímetro</th>
+                    <th style="padding: 10px;">Custo Total</th>
                     <th style="padding: 10px;">Ações</th>
                 </tr>
             </thead>
             <tbody id="fuelLogBody">
-                <!-- Injetado pelo Banco de Dados Virtual -->
+                <!-- Injetado pelo Banco de Dados -->
             </tbody>
         </table>
     </div>
 </div>
+
+<script>
+// Capacidade máxima do veículo selecionado
+window._selectedVehicleCapacity = 0;
+window._lastHorimeter = 0;
+
+async function onVehicleChangeFuel(sel) {
+    const vId = sel.value;
+    window._selectedVehicleCapacity = 0;
+    window._lastHorimeter = 0;
+    document.getElementById('fuelTankHint').textContent = '';
+    document.getElementById('horimeterHint').textContent = '';
+    if (!vId) return;
+
+    try {
+        const token = localStorage.getItem('fcs_auth');
+        // Buscar capacidade
+        const res = await fetch('/api/data/vehicles', { headers: { 'Authorization': 'Bearer ' + token } });
+        const vehicles = await res.json();
+        const v = vehicles.find(x => String(x.id) === String(vId));
+        if (v && v.capacity > 0) {
+            window._selectedVehicleCapacity = parseFloat(v.capacity);
+            document.getElementById('fuelTankHint').style.color = 'var(--text-muted)';
+            document.getElementById('fuelTankHint').textContent = `⛽ Tanque: ${v.capacity}L — Máximo permitido`;
+        }
+        // Buscar último horímetro
+        const hRes = await fetch(`/api/vehicles/${vId}/last-horimeter`, { headers: { 'Authorization': 'Bearer ' + token } });
+        const hData = await hRes.json();
+        window._lastHorimeter = hData.last_horimeter || 0;
+        if (window._lastHorimeter > 0) {
+            document.getElementById('horimeterHint').style.color = 'var(--text-muted)';
+            document.getElementById('horimeterHint').textContent = `Último horímetro registrado: ${window._lastHorimeter}h — novo valor deve ser ≥ ${window._lastHorimeter}h`;
+        }
+    } catch(e) {}
+}
+
+function validateFuelLiters() {
+    const liters = parseFloat(document.getElementById('fuelLitersInput').value) || 0;
+    const hint = document.getElementById('litersHint');
+    const cap = window._selectedVehicleCapacity;
+    if (cap > 0 && liters > cap) {
+        hint.style.color = 'var(--danger)';
+        hint.textContent = `✗ Volume (${liters}L) excede a capacidade do tanque (${cap}L)`;
+    } else if (liters > 0 && cap > 0) {
+        hint.style.color = 'var(--success)';
+        hint.textContent = `✓ Volume válido (${liters}L de ${cap}L)`;
+    } else {
+        hint.textContent = '';
+    }
+    calcFuelTotal();
+}
+
+function validateHorimeter() {
+    const h = parseFloat(document.getElementById('horimeterInput').value) || 0;
+    const lastH = window._lastHorimeter;
+    const hint = document.getElementById('horimeterHint');
+    if (h > 0 && lastH > 0) {
+        if (h < lastH) {
+            hint.style.color = 'var(--danger)';
+            hint.textContent = `✗ Horímetro (${h}h) menor que o último registrado (${lastH}h)`;
+        } else {
+            hint.style.color = 'var(--success)';
+            hint.textContent = `✓ Horímetro válido`;
+        }
+    }
+}
+
+function calcFuelTotal() {
+    const liters = parseFloat(document.getElementById('fuelLitersInput').value) || 0;
+    const pricePerL = parseFloat(document.getElementById('pricePerLiter').value) || 0;
+    const total = (liters * pricePerL).toFixed(2);
+    document.getElementById('fuelCostTotal').value = total > 0 ? total : '';
+}
+</script>

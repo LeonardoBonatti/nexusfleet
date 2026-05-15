@@ -1,24 +1,54 @@
 <!-- manutencao.html -->
 <div class="page-header">
     <h2><i class="fa-solid fa-screwdriver-wrench" style="color: var(--primary-color);"></i> Lançar Manutenção</h2>
-    <p>Adicione ocorrências veiculares para abater no cálculo de lucratividade da frota.</p>
+    <p>Registre serviços realizados nos veículos. O horímetro é validado de forma sequencial.</p>
 </div>
 
 <div class="form-container">
     <form id="maintenanceForm">
         <div class="form-group">
             <label><i class="fa-solid fa-car"></i> Veículo</label>
-            <select name="vehicle_id" required><option value="">Selecione...</option></select>
+            <select name="vehicle_id" id="maintVehicleSelect" required onchange="onVehicleChangeMaint(this)">
+                <option value="">Selecione...</option>
+            </select>
         </div>
         
         <div class="form-row">
             <div class="form-group">
-                <label>Tipo de Serviço</label>
-                <input type="text" name="service_type" placeholder="Ex: Troca de pastilhas" required>
+                <label><i class="fa-solid fa-wrench"></i> Tipo de Serviço</label>
+                <select name="service_type" required>
+                    <option value="">Selecione o serviço...</option>
+                    <option value="Troca de Óleo e Filtro">Troca de Óleo e Filtro</option>
+                    <option value="Revisão Geral">Revisão Geral</option>
+                    <option value="Troca de Pneus">Troca de Pneus</option>
+                    <option value="Freios (Pastilhas/Discos)">Freios (Pastilhas/Discos)</option>
+                    <option value="Correia Dentada">Correia Dentada</option>
+                    <option value="Alinhamento e Balanceamento">Alinhamento e Balanceamento</option>
+                    <option value="Troca de Bateria">Troca de Bateria</option>
+                    <option value="Sistema Elétrico">Sistema Elétrico</option>
+                    <option value="Injeção Eletrônica">Injeção Eletrônica</option>
+                    <option value="Ar Condicionado">Ar Condicionado</option>
+                    <option value="Suspensão">Suspensão</option>
+                    <option value="Embreagem">Embreagem</option>
+                    <option value="Funilaria e Pintura">Funilaria e Pintura</option>
+                    <option value="Outro">Outro (Especificar no campo abaixo)</option>
+                </select>
             </div>
             <div class="form-group">
-                <label>Custo (R$)</label>
-                <input type="number" step="0.01" name="cost" placeholder="Ex: 150.50" required>
+                <label><i class="fa-solid fa-comment"></i> Descrição Detalhada <span style="color:var(--text-muted);font-size:0.8em;">(opcional)</span></label>
+                <input type="text" name="service_detail" placeholder="Ex: Troca de pastilhas dianteiras + traseiras">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label><i class="fa-solid fa-money-bill-wave"></i> Custo Total (R$)</label>
+                <input type="number" step="0.01" name="cost" placeholder="Ex: 350.00" min="0" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fa-solid fa-clock-rotate-left"></i> Horímetro no momento (h) <span style="color:var(--text-muted);font-size:0.8em;">(opcional)</span></label>
+                <input type="number" step="0.1" name="horimeter" id="maintHorimeterInput" placeholder="Ex: 2350.5 h" min="0" oninput="validateMaintHorimeter()">
+                <small id="maintHorimeterHint" style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px; display:block;"></small>
             </div>
         </div>
 
@@ -26,9 +56,9 @@
     </form>
 </div>
 
-<!-- CONTAINER DE HISTORICO DE MANUTENCOES -->
+<!-- HISTORICO DE MANUTENCOES -->
 <div class="form-container" style="max-width: 100%; margin-top: 30px;">
-    <h3 style="margin-bottom: 15px; color: var(--text-main);"><i class="fa-solid fa-clock-rotate-left"></i> Gastos com Manutenções (Log Diário)</h3>
+    <h3 style="margin-bottom: 15px; color: var(--text-main);"><i class="fa-solid fa-clock-rotate-left"></i> Gastos com Manutenções</h3>
     <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead>
@@ -36,13 +66,50 @@
                     <th style="padding: 10px;">Data</th>
                     <th style="padding: 10px;">Veículo</th>
                     <th style="padding: 10px;">Serviço Realizado</th>
-                    <th style="padding: 10px;">Custo Pago (R$)</th>
+                    <th style="padding: 10px;">Horímetro</th>
+                    <th style="padding: 10px;">Custo (R$)</th>
                     <th style="padding: 10px;">Ações</th>
                 </tr>
             </thead>
             <tbody id="maintenanceLogBody">
-                <!-- Injetado pelo Banco de Dados Virtual -->
+                <!-- Injetado pelo Banco de Dados -->
             </tbody>
         </table>
     </div>
 </div>
+
+<script>
+window._maintLastHorimeter = 0;
+
+async function onVehicleChangeMaint(sel) {
+    const vId = sel.value;
+    window._maintLastHorimeter = 0;
+    document.getElementById('maintHorimeterHint').textContent = '';
+    if (!vId) return;
+    try {
+        const token = localStorage.getItem('fcs_auth');
+        const hRes = await fetch(`/api/vehicles/${vId}/last-horimeter`, { headers: { 'Authorization': 'Bearer ' + token } });
+        const hData = await hRes.json();
+        window._maintLastHorimeter = hData.last_horimeter || 0;
+        if (window._maintLastHorimeter > 0) {
+            document.getElementById('maintHorimeterHint').style.color = 'var(--text-muted)';
+            document.getElementById('maintHorimeterHint').textContent = `Último horímetro registrado: ${window._maintLastHorimeter}h`;
+        }
+    } catch(e) {}
+}
+
+function validateMaintHorimeter() {
+    const h = parseFloat(document.getElementById('maintHorimeterInput').value) || 0;
+    const lastH = window._maintLastHorimeter;
+    const hint = document.getElementById('maintHorimeterHint');
+    if (h > 0 && lastH > 0) {
+        if (h < lastH) {
+            hint.style.color = 'var(--danger)';
+            hint.textContent = `✗ Horímetro (${h}h) menor que o último registrado (${lastH}h)`;
+        } else {
+            hint.style.color = 'var(--success)';
+            hint.textContent = `✓ Horímetro válido`;
+        }
+    }
+}
+</script>

@@ -287,6 +287,8 @@ async function renderVehicleTable() {
                     <td style="padding: 12px; color: var(--text-muted);">#${v.id.toString().padStart(4, '0')}</td>
                     <td style="padding: 12px; font-weight: bold; color: var(--text-main);">${v.plate}</td>
                     <td style="padding: 12px;">${v.brand} ${v.model}</td>
+                    <td style="padding: 12px; color: var(--text-muted);">${v.capacity ? v.capacity + 'L' : '-'}</td>
+                    <td style="padding: 12px;"><span style="background: rgba(59,130,246,0.1); color: var(--primary-color); padding: 3px 8px; border-radius: 4px; font-size: 0.8rem;">${v.fuel_type || 'Flex'}</span></td>
                     <td style="padding: 12px;"><span style="color: var(--success);"><i class="fa-solid fa-check"></i> Ativo</span></td>
                     <td style="padding: 12px; display: flex; gap: 10px;">
                         <button class="btn-icon" style="color: var(--primary-color);" onclick="editRecord('vehicles', '${v.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
@@ -319,8 +321,10 @@ async function renderFuelTable() {
                 tr.innerHTML = `
                     <td style="padding: 12px; color: var(--text-muted);">${f.date}</td>
                     <td style="padding: 12px; font-weight: 500;">${f.vehicle}</td>
+                    <td style="padding: 12px;"><span style="background: rgba(59,130,246,0.1); color: var(--primary-color); padding: 3px 8px; border-radius: 4px; font-size: 0.8rem;">${f.fuel_type || '-'}</span></td>
+                    <td style="padding: 12px; color: var(--text-muted);">${f.liters ? parseFloat(f.liters).toFixed(1) + 'L' : '-'}</td>
+                    <td style="padding: 12px; color: var(--text-muted);">${f.horimeter > 0 ? parseFloat(f.horimeter).toFixed(1) + 'h' : '-'}</td>
                     <td style="padding: 12px; color: var(--primary-color); font-weight: bold;">R$ ${parseFloat(f.cost).toFixed(2).replace('.', ',')}</td>
-                    <td style="padding: 12px;"><span style="color: var(--success);"><i class="fa-solid fa-check-double"></i> Confirmado</span></td>
                     <td style="padding: 12px; display: flex; gap: 10px;">
                         <button class="btn-icon" style="color: var(--primary-color);" onclick="editRecord('fuels', '${f.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn-icon" style="color: var(--danger);" onclick="deleteRecord('fuels', '${f.id}')" title="Mover para Lixeira"><i class="fa-solid fa-trash"></i></button>
@@ -351,6 +355,7 @@ async function renderMaintenanceTable() {
                     <td style="padding: 12px; color: var(--text-muted);">${m.date}</td>
                     <td style="padding: 12px; font-weight: 500;">${m.vehicle}</td>
                     <td style="padding: 12px; color: var(--text-main);">${m.service}</td>
+                    <td style="padding: 12px; color: var(--text-muted);">${m.horimeter > 0 ? parseFloat(m.horimeter).toFixed(1) + 'h' : '-'}</td>
                     <td style="padding: 12px; font-weight: bold; color: var(--danger);">R$ ${parseFloat(m.cost).toFixed(2).replace('.', ',')}</td>
                     <td style="padding: 12px; display: flex; gap: 10px;">
                         <button class="btn-icon" style="color: var(--primary-color);" onclick="editRecord('maintenances', '${m.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
@@ -367,14 +372,80 @@ async function setupPageScripts(pageName) {
     if (pageName === 'dashboard' || !pageName) {
         let fuels = await apiFetch('/api/data/fuels').then(r => r.json()).catch(() => []);
         let manuts = await apiFetch('/api/data/maintenances').then(r => r.json()).catch(() => []);
-        
+        let vehicles = await apiFetch('/api/data/vehicles').then(r => r.json()).catch(() => []);
+
         let reminders = [];
         try { reminders = JSON.parse(localStorage.getItem('fcs_reminders')) || []; } catch(e){}
-        
-        // 1. Custo Mensal Geral
+
+        // 1. Custo Total Geral (somente dados reais)
         let totalCost = 0;
         fuels.forEach(f => totalCost += parseFloat(f.cost || 0));
         manuts.forEach(m => totalCost += parseFloat(m.cost || 0));
+        const costEl = document.getElementById('dashTotalCost');
+        if (costEl) costEl.textContent = totalCost > 0
+            ? 'R$ ' + totalCost.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+            : 'R$ 0,00';
+
+        // 2. Alertas
+        const alertsEl = document.getElementById('dashAlertsCount');
+        if (alertsEl) alertsEl.textContent = reminders.length > 0 ? reminders.length + ' Lembretes Ativos' : 'Nenhum Alerta';
+
+        // 3. Eficiência Média (km/L) — real se tiver hodômetro, senão 0
+        const kpiCards = document.querySelectorAll('.dashboard-widgets .kpi-card');
+        if (kpiCards.length >= 2) {
+            const effEl = kpiCards[1].querySelector('p');
+            let totalLiters = fuels.reduce((a, f) => a + parseFloat(f.liters || 0), 0);
+            if (effEl) effEl.textContent = totalLiters > 0 ? (totalLiters / fuels.length).toFixed(1) + ' km/L (médio)' : '0.0 km/L';
+        }
+
+        // 4. Gráfico por tipo de combustível separado (dados reais)
+        const ctx = document.getElementById('dashboardChart');
+        if (ctx) {
+            if (window.myDashChart) window.myDashChart.destroy();
+            const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const curYear = new Date().getFullYear();
+            let gasData = Array(12).fill(0);
+            let alcData = Array(12).fill(0);
+            let dieselData = Array(12).fill(0);
+
+            fuels.forEach(f => {
+                // Parse date in pt-BR format (DD/MM/YYYY) or ISO
+                let month = -1;
+                if (f.date && f.date.includes('/')) {
+                    const parts = f.date.split('/');
+                    month = parseInt(parts[1]) - 1;
+                } else if (f.date && f.date.includes('-')) {
+                    month = parseInt(f.date.split('-')[1]) - 1;
+                }
+                if (month < 0 || month > 11) return;
+                const cost = parseFloat(f.cost || 0);
+                const ft = (f.fuel_type || '').toLowerCase();
+                if (ft.includes('álcool') || ft.includes('alcool') || ft.includes('etanol')) alcData[month] += cost;
+                else if (ft.includes('diesel')) dieselData[month] += cost;
+                else gasData[month] += cost;
+            });
+
+            window.myDashChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [
+                        { label: 'Gasolina (R$)', data: gasData, backgroundColor: 'rgba(37,99,235,0.85)', borderRadius: 4 },
+                        { label: 'Álcool/Etanol (R$)', data: alcData, backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 4 },
+                        { label: 'Diesel (R$)', data: dieselData, backgroundColor: 'rgba(245,158,11,0.85)', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: document.body.classList.contains('dark-mode') ? '#9ca3af' : '#4b5563', font: {family: 'Inter'} } } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { color: document.body.classList.contains('dark-mode') ? '#9ca3af' : '#4b5563', callback: val => 'R$ ' + val }, grid: { color: document.body.classList.contains('dark-mode') ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } },
+                        x: { ticks: { color: document.body.classList.contains('dark-mode') ? '#9ca3af' : '#4b5563' }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+    }
         
         const costEl = document.getElementById('dashTotalCost');
         if (costEl) costEl.textContent = 'R$ ' + totalCost.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -553,25 +624,31 @@ async function setupPageScripts(pageName) {
     }
 
     if (pageName === 'abastecimento' || pageName === 'manutencao') {
-        const selectElement = document.querySelector('select[name="vehicle_id"]');
-        
-        // Carrega da memória para popular dropdown
-        if (selectElement) {
-            let savedVehicles = JSON.parse(localStorage.getItem('fcs_vehicles')) || [];
-            selectElement.innerHTML = '<option value="">Selecione o veículo...</option>';
+        // Carrega veículos da API (não do localStorage) para popular dropdowns
+        const selectIds = pageName === 'abastecimento'
+            ? ['fuelVehicleSelect']
+            : ['maintVehicleSelect'];
 
-            if (savedVehicles.length === 0) {
-                selectElement.innerHTML += '<option disabled>Nenhum veículo cadastrado. Vá em "Veículos".</option>';
-            } else {
-                savedVehicles.forEach(v => {
-                    const option = document.createElement('option');
-                    option.value = v.id;
-                    option.textContent = `${v.brand} ${v.model} (Placa: ${v.plate})`;
-                    selectElement.appendChild(option);
-                });
-            }
-        }
-        
+        try {
+            let vehicles = await apiFetch('/api/data/vehicles').then(r => r.json());
+            selectIds.forEach(selId => {
+                const sel = document.getElementById(selId);
+                if (!sel) return;
+                sel.innerHTML = '<option value="">Selecione o veículo...</option>';
+                if (!vehicles || vehicles.length === 0) {
+                    sel.innerHTML += '<option disabled>Nenhum veículo cadastrado. Vá em "Veículos".</option>';
+                } else {
+                    vehicles.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.id;
+                        opt.dataset.capacity = v.capacity || 0;
+                        opt.textContent = `${v.brand} ${v.model} (Placa: ${v.plate})`;
+                        sel.appendChild(opt);
+                    });
+                }
+            });
+        } catch(e) { console.error('Erro ao carregar veículos:', e); }
+
         if (pageName === 'manutencao') renderMaintenanceTable();
         if (pageName === 'abastecimento') renderFuelTable();
     }
@@ -634,18 +711,44 @@ async function setupPageScripts(pageName) {
             // Une todos para renderizar
             const allStations = [...defaultStations, ...savedUserStations];
 
-            // Renderiza Pinos
             allStations.forEach(st => {
-                let isUserAdded = !st.price.includes('R$') ? `R$ ${st.price}` : st.price; // normaliza preço
-                
-                L.marker([st.lat, st.lng], {
+                const lat = st.lat;
+                const lng = st.lng;
+
+                // Monta linhas de preco por tipo de combustivel
+                let priceLines = '';
+                if (st.prices) {
+                    if (st.prices.alcool) priceLines += `<div style="display:flex;justify-content:space-between;gap:20px;"><span style="color:var(--text-muted);">🟢 Álcool Comum</span><b style="color:#22c55e;">R$ ${parseFloat(st.prices.alcool).toFixed(2).replace('.',',')}/L</b></div>`;
+                    if (st.prices.gas) priceLines += `<div style="display:flex;justify-content:space-between;gap:20px;"><span style="color:var(--text-muted);">🔵 Gasolina Comum</span><b style="color:#3b82f6;">R$ ${parseFloat(st.prices.gas).toFixed(2).replace('.',',')}/L</b></div>`;
+                    if (st.prices.gas_ad) priceLines += `<div style="display:flex;justify-content:space-between;gap:20px;"><span style="color:var(--text-muted);">🟣 Gasolina Aditivada</span><b style="color:#8b5cf6;">R$ ${parseFloat(st.prices.gas_ad).toFixed(2).replace('.',',')}/L</b></div>`;
+                    if (st.prices.diesel) priceLines += `<div style="display:flex;justify-content:space-between;gap:20px;"><span style="color:var(--text-muted);">🟡 Diesel S10</span><b style="color:#f59e0b;">R$ ${parseFloat(st.prices.diesel).toFixed(2).replace('.',',')}/L</b></div>`;
+                    if (st.prices.gnv) priceLines += `<div style="display:flex;justify-content:space-between;gap:20px;"><span style="color:var(--text-muted);">🔴 GNV</span><b style="color:#ef4444;">R$ ${parseFloat(st.prices.gnv).toFixed(2).replace('.',',')}/m³</b></div>`;
+                } else if (st.price) {
+                    priceLines = `<div style="color:#3b82f6; font-weight:bold;">${st.price}</div>`;
+                }
+
+                const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+                const wazeUrl = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+
+                L.marker([lat, lng], {
                     icon: L.divIcon({
                         className: 'custom-icon',
                         html: `<i class="fa-solid fa-gas-pump" style="color: #dc2626; font-size: 20px;"></i>`,
                         iconSize: [20, 20]
                     })
                 }).addTo(map)
-                    .bindPopup(`<div style="text-align:center;"><b>${st.name}</b><br>Preço Atual: <span style="color: #dc2626; font-weight: bold; font-size: 1.1rem;">${isUserAdded}</span></div>`);
+                    .bindPopup(`
+                        <div style="min-width:220px;">
+                            <b style="font-size:1rem;">${st.name}</b>
+                            <hr style="margin:8px 0; border-color:#e5e7eb;">
+                            ${priceLines || '<span style="color:#6b7280;">Preços não informados</span>'}
+                            <hr style="margin:8px 0; border-color:#e5e7eb;">
+                            <div style="display:flex;gap:8px;margin-top:4px;">
+                                <a href="${googleMapsUrl}" target="_blank" style="flex:1;text-align:center;background:#4285f4;color:white;padding:6px 4px;border-radius:6px;text-decoration:none;font-size:0.82rem;font-weight:600;"><i class="fa-brands fa-google"></i> Google Maps</a>
+                                <a href="${wazeUrl}" target="_blank" style="flex:1;text-align:center;background:#00b5d6;color:white;padding:6px 4px;border-radius:6px;text-decoration:none;font-size:0.82rem;font-weight:600;">🗺 Waze</a>
+                            </div>
+                        </div>
+                    `);
             });
 
             // Adiciona Base e Clientes (NexusFleet Integration)
@@ -1188,44 +1291,116 @@ async function setupPageScripts(pageName) {
                     if(tEl) tEl.remove();
                     
                     let lower = text.toLowerCase();
-                    let response = "Interessante. Como posso te ajudar trabalhando com os seus dados logísticos hoje?";
+                    let response = "Olá! Sou o assistente da NexusFleet. Tente perguntas como:\n\n<b>\"Qual o gasto total da frota?\"</b>\n<b>\"Qual a última manutenção do [placa]?\"</b>\n<b>\"Quantos litros o [placa] já abasteceu?\"</b>\n<b>\"Quais compromissos tenho essa semana?\"</b>";
 
                     let fuels = await apiFetch('/api/data/fuels').then(r => r.json()).catch(() => []);
                     let manuts = await apiFetch('/api/data/maintenances').then(r => r.json()).catch(() => []);
                     let vehicles = await apiFetch('/api/data/vehicles').then(r => r.json()).catch(() => []);
 
-                    if(lower.includes('gasto') || lower.includes('despesa') || lower.includes('custo') || lower.includes('dinheiro') || lower.includes('financeiro')) {
-                        let sumAbast = fuels.reduce((acc, obj) => acc + parseFloat(obj.cost), 0);
-                        let sumManut = manuts.reduce((acc, obj) => acc + parseFloat(obj.cost), 0);
-                        let sumAll = sumAbast + sumManut;
-                        if(sumAll === 0) {
-                            response = "Após verificar o banco de dados principal, não encontrei registros de despesas até agora. Adicione abastecimentos primeiro.";
+                    // Helpers
+                    const fmt = v => parseFloat(v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2});
+                    const findVehicleByHint = (hint) => vehicles.find(v =>
+                        hint.includes(v.plate.toLowerCase()) ||
+                        hint.includes(v.model.toLowerCase()) ||
+                        hint.includes(v.brand.toLowerCase())
+                    );
+
+                    if (lower.includes('olá') || lower.includes('oi') || lower.includes('bom dia') || lower.includes('boa tarde') || lower.includes('boa noite')) {
+                        response = `Olá! Sou o <b>Assistente Inteligente NexusFleet</b> 🤖<br><br>Posso responder perguntas como:<br>• <i>"Qual o gasto total da frota?"</i><br>• <i>"Quanto o [placa] já gastou?"</i><br>• <i>"Qual a última manutenção do [placa]?"</i><br>• <i>"Quantos litros o [placa] já abasteceu?"</i><br>• <i>"Qual o horimétro do [placa]?"</i><br>• <i>"Quando o [placa] foi cadastrado?"</i><br>• <i>"Quais compromissos tenho essa semana?"</i><br>• <i>"Quantos veículos estou gerenciando?"</i>`;
+                    }
+                    else if (lower.includes('gasto') || lower.includes('despesa') || lower.includes('custo') || lower.includes('financeiro') || lower.includes('total')) {
+                        // Verifica se é pergunta sobre veículo específico
+                        const vMatch = findVehicleByHint(lower);
+                        if (vMatch) {
+                            const vFuels = fuels.filter(f => String(f.vehicle_id) === String(vMatch.id));
+                            const vManuts = manuts.filter(m => String(m.vehicle_id) === String(vMatch.id));
+                            const sumF = vFuels.reduce((a,f) => a + parseFloat(f.cost||0), 0);
+                            const sumM = vManuts.reduce((a,m) => a + parseFloat(m.cost||0), 0);
+                            response = `💰 <b>${vMatch.brand} ${vMatch.model} (${vMatch.plate})</b><br>Abastecimentos: <b>R$ ${fmt(sumF)}</b><br>Manutenções: <b>R$ ${fmt(sumM)}</b><br>Total geral: <b style="color:var(--primary-color);">R$ ${fmt(sumF+sumM)}</b>`;
                         } else {
-                            response = `Calculando seus registros em tempo real... A sua frota teve um gasto total de <b>R$ ${sumAll.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b>. Sendo exatos R$ ${sumAbast.toLocaleString('pt-BR', {minimumFractionDigits: 2})} em abastecimentos e R$ ${sumManut.toLocaleString('pt-BR', {minimumFractionDigits: 2})} em peças/manutenção periódica.`;
-                        }
-                    } 
-                    else if(lower.includes('resumo') || lower.includes('frota') || lower.includes('carro') || lower.includes('veículo')) {
-                        if(vehicles.length === 0){
-                            response = "Atualmente não detectei nenhum veículo registrado na sua base principal. Vá na aba lateral 'Veículos' e cadastre o primeiro carro/caminhão!";
-                        } else {
-                            let relFuel = fuels.length > 0 ? "O registro mais recente apontou atividade na frota para o veículo " + fuels[fuels.length-1].vehicle + "." : "";
-                            response = `Atualmente, sua corporação administra <b>${vehicles.length} veículos</b> através de mim. ${relFuel} Posso afirmar que o ecossistema e a telemetria geral operam em desgaste aceitável.`;
-                        }
-                    } 
-                    else if (lower.includes('manutenção') || lower.includes('revisão') || lower.includes('pneu') || lower.includes('oficina') || lower.includes('óleo')) {
-                        if(manuts.length > 0) {
-                            let lastM = manuts[manuts.length-1];
-                            response = `Consultei o diário de mecânica e vi que o último serviço contratado foi <b>${lastM.service}</b>, associado ao <b>${lastM.vehicle}</b>. Como sua quilometragem está subindo, posso agendar a próxima checagem caso o motorista informe falha nas correias!`;
-                        } else {
-                            response = "Não existem manutenções pagas no meu painel. Você está operando com nível ótimo de desgaste. Continue acompanhando a aba do Sistema de Saúde!";
+                            const sumF = fuels.reduce((a,f) => a + parseFloat(f.cost||0), 0);
+                            const sumM = manuts.reduce((a,m) => a + parseFloat(m.cost||0), 0);
+                            const total = sumF + sumM;
+                            if (total === 0) response = "Não há registros de despesas ainda. Cadastre um abastecimento ou manutenção!";
+                            else response = `💰 Gasto total da frota: <b style="color:var(--primary-color);">R$ ${fmt(total)}</b><br>Sendo <b>R$ ${fmt(sumF)}</b> em abastecimentos e <b>R$ ${fmt(sumM)}</b> em manutenções.`;
                         }
                     }
-                    else if (lower.includes('olá') || lower.includes('oi') || lower.includes('bom dia') || lower.includes('boa tarde')) {
-                        response = `Olá! Meus protocolos estão atualizados na versão 2026. Eu consigo analisar resumões sobre sua rede viária, seu fluxo de caixa e relatórios de veículos com poucos comandos. Tente algo como: "O que eu gastei?"`;
+                    else if (lower.includes('litros') || lower.includes('abastec') || lower.includes('combust')) {
+                        const vMatch = findVehicleByHint(lower);
+                        if (vMatch) {
+                            const vFuels = fuels.filter(f => String(f.vehicle_id) === String(vMatch.id));
+                            const totalL = vFuels.reduce((a,f) => a + parseFloat(f.liters||0), 0);
+                            const totalC = vFuels.reduce((a,f) => a + parseFloat(f.cost||0), 0);
+                            const types = [...new Set(vFuels.map(f => f.fuel_type).filter(Boolean))].join(', ');
+                            response = `⛽ <b>${vMatch.brand} ${vMatch.model} (${vMatch.plate})</b><br>Total abastecido: <b>${totalL.toFixed(1)}L</b><br>Gasto em combustível: <b>R$ ${fmt(totalC)}</b><br>Tipos utilizados: <b>${types || 'não informado'}</b>`;
+                        } else {
+                            const totalL = fuels.reduce((a,f) => a + parseFloat(f.liters||0), 0);
+                            response = `⛽ A frota consumiu <b>${totalL.toFixed(1)} litros</b> no total registrado. Especifique uma placa ou modelo para detalhes por veículo.`;
+                        }
+                    }
+                    else if (lower.includes('manuten') || lower.includes('revis') || lower.includes('oficina') || lower.includes('óleo') || lower.includes('pneu')) {
+                        const vMatch = findVehicleByHint(lower);
+                        if (vMatch) {
+                            const vManuts = manuts.filter(m => String(m.vehicle_id) === String(vMatch.id));
+                            if (vManuts.length === 0) response = `Não há manutenções registradas para <b>${vMatch.plate}</b> ainda.`;
+                            else {
+                                const last = vManuts[0];
+                                response = `🔧 Última manutenção do <b>${vMatch.plate}</b>:<br>Serviço: <b>${last.service}</b><br>Data: <b>${last.date}</b><br>Custo: <b>R$ ${fmt(last.cost)}</b>${last.horimeter > 0 ? '<br>Horímetro: <b>' + parseFloat(last.horimeter).toFixed(1) + 'h</b>' : ''}`;
+                            }
+                        } else {
+                            if (manuts.length === 0) response = "Nenhuma manutenção registrada ainda.";
+                            else { const last = manuts[0]; response = `🔧 Última manutenção da frota: <b>${last.service}</b> em <b>${last.vehicle}</b> — ${last.date} — R$ ${fmt(last.cost)}`; }
+                        }
+                    }
+                    else if (lower.includes('horímetro') || lower.includes('horimetro') || lower.includes('horas')) {
+                        const vMatch = findVehicleByHint(lower);
+                        if (vMatch) {
+                            const allH = [
+                                ...fuels.filter(f => String(f.vehicle_id) === String(vMatch.id)).map(f => parseFloat(f.horimeter||0)),
+                                ...manuts.filter(m => String(m.vehicle_id) === String(vMatch.id)).map(m => parseFloat(m.horimeter||0))
+                            ].filter(h => h > 0);
+                            const maxH = allH.length > 0 ? Math.max(...allH) : 0;
+                            response = maxH > 0
+                                ? `⏱ O último horímetro registrado do <b>${vMatch.plate}</b> é <b>${maxH.toFixed(1)}h</b>.`
+                                : `Não há horímetro registrado para <b>${vMatch.plate}</b> ainda.`;
+                        } else {
+                            response = "Especifique a placa ou modelo do veículo para consultar o horímetro. Ex: <i>\"Qual o horímetro do ABC1D23?\"</i>";
+                        }
+                    }
+                    else if (lower.includes('quando foi cadastrado') || lower.includes('data de cadastro') || lower.includes('adicionado')) {
+                        const vMatch = findVehicleByHint(lower);
+                        if (vMatch) {
+                            const date = vMatch.created_at ? new Date(vMatch.created_at).toLocaleDateString('pt-BR') : 'data não disponível';
+                            response = `📅 O veículo <b>${vMatch.brand} ${vMatch.model} (${vMatch.plate})</b> foi cadastrado na frota em <b>${date}</b>.`;
+                        } else {
+                            response = "Especifique a placa ou modelo do veículo para consultar a data de cadastro.";
+                        }
+                    }
+                    else if (lower.includes('veículo') || lower.includes('veiculo') || lower.includes('frota') || lower.includes('carro') || lower.includes('caminh')) {
+                        if (vehicles.length === 0) response = "Nenhum veículo cadastrado ainda. Vá na aba <b>Veículos</b> e adicione o primeiro!";
+                        else {
+                            const list = vehicles.map(v => `• <b>${v.plate}</b> — ${v.brand} ${v.model} (${v.fuel_type || 'Flex'})`).join('<br>');
+                            response = `🚗 Sua frota tem <b>${vehicles.length} veículo(s)</b>:<br>${list}`;
+                        }
+                    }
+                    else if (lower.includes('agenda') || lower.includes('compromisso') || lower.includes('semana') || lower.includes('lembrete') || lower.includes('ipva') || lower.includes('cnh')) {
+                        let rems = [];
+                        try { rems = JSON.parse(localStorage.getItem('fcs_reminders')) || []; } catch(e) {}
+                        const now = new Date();
+                        const weekEnd = new Date(now); weekEnd.setDate(now.getDate() + 7);
+                        const thisWeek = rems.filter(r => { const d = new Date(r.date + 'T12:00:00'); return d >= now && d <= weekEnd; });
+                        if (rems.length === 0) response = "📅 Não há lembretes registrados na agenda. Adicione compromissos na aba <b>Agenda Inteligente</b>.";
+                        else if (thisWeek.length === 0) response = `📅 Você tem <b>${rems.length} lembrete(s)</b> na agenda, mas nenhum para esta semana.`;
+                        else {
+                            const list = thisWeek.map(r => `• <b>${r.title}</b> — ${new Date(r.date+'T12:00:00').toLocaleDateString('pt-BR')}`).join('<br>');
+                            response = `📅 <b>${thisWeek.length} compromisso(s) esta semana:</b><br>${list}`;
+                        }
                     }
                     else {
-                        response = `Desculpe, meu módulo preditivo no momento está treinado apenas para cruzar os DataFrames preenchidos pelos usuários. Tente perguntas chave como: <br><br><b>"Qual foi meu gasto total no mês?"</b><br><b>"Faça um resumo dos meus carros"</b><br><b>"Puxe o histórico das manutenções"</b>.`;
+                        response = `Desculpe, não entendi sua pergunta. Posso ajudar com:<br><br>• <i>"Qual o gasto total da frota?"</i><br>• <i>"Quanto o [placa] já gastou?"</i><br>• <i>"Qual a última manutenção do [placa]?"</i><br>• <i>"Quantos litros o [placa] abasteceu?"</i><br>• <i>"Qual o horímetro do [placa]?"</i><br>• <i>"Quando o [placa] foi cadastrado?"</i><br>• <i>"Quais compromissos tenho essa semana?"</i>`;
                     }
+
+
 
                     box.innerHTML += `
                         <div style="display: flex; gap: 15px; margin-bottom: 20px;">
@@ -1253,77 +1428,135 @@ document.addEventListener('submit', async (e) => {
     if (e.target.id === 'vehicleForm') {
         e.preventDefault();
         const form = e.target;
-        const plate = form.querySelector('[name="plate"]').value;
+        const plate = form.querySelector('[name="plate"]').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
         const model = form.querySelector('[name="model"]').value;
         const brand = form.querySelector('[name="brand"]').value;
+        const year = form.querySelector('[name="year"]').value;
+        const fuel_type = form.querySelector('[name="fuel_type"]').value;
+        const capacity = parseFloat(form.querySelector('[name="capacity"]').value) || 0;
 
-        await apiFetch('/api/data/vehicles', {
+        // Validação Mercosul/Antigo no frontend
+        const mercosul = /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(plate);
+        const antigo = /^[A-Z]{3}[0-9]{4}$/.test(plate);
+        if (!mercosul && !antigo) {
+            alert('Placa inválida! Use o padrão Mercosul (ABC1D23) ou antigo (ABC1234).');
+            return;
+        }
+
+        const res = await apiFetch('/api/data/vehicles', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ plate, model, brand })
+            body: JSON.stringify({ plate, model, brand, year, fuel_type, capacity })
         });
 
-        alert(`Sucesso! O veículo ${brand} ${model} (${plate}) foi adicionado à sua frota.`);
-        form.reset();
-        renderVehicleTable();
+        if (res.ok) {
+            alert(`✅ Veículo ${brand} ${model} (${plate}) adicionado à frota!`);
+            form.reset();
+            document.getElementById('plateHint').style.color = 'var(--text-muted)';
+            document.getElementById('plateHint').textContent = 'Formato: 3 letras + 1 número + 1 letra + 2 números (Mercosul) ou 3 letras + 4 números (Antigo)';
+            renderVehicleTable();
+        } else {
+            const err = await res.json();
+            alert('Erro: ' + (err.error || 'Falha ao salvar.'));
+        }
     }
 
     // Formulário de Abastecimento
     else if (e.target.id === 'fuelRecordForm') {
         e.preventDefault();
         const form = e.target;
-        
-        let savedVehicles = await apiFetch('/api/data/vehicles').then(r => r.json());
-        let vId = form.querySelector('[name="vehicle_id"]').value;
-        let vehicleObj = savedVehicles.find(v => String(v.id) === String(vId)) || { brand: 'Veículo', model: 'Desconhecido', plate: 'XXX' };
-        
-        let litros = parseFloat(form.querySelector('[name="liters"]').value) || 0;
-        let precoL = parseFloat(form.querySelector('[name="price"]').value) || 0;
-        let totalCost = litros * precoL;
 
-        await apiFetch('/api/data/fuels', {
+        let vehicles = await apiFetch('/api/data/vehicles').then(r => r.json()).catch(() => []);
+        let vId = form.querySelector('[name="vehicle_id"]').value;
+        if (!vId) { alert('Selecione um veículo.'); return; }
+        let vehicleObj = vehicles.find(v => String(v.id) === String(vId)) || { brand: 'Veículo', model: 'Desconhecido', plate: 'XXX', capacity: 0 };
+
+        const liters = parseFloat(form.querySelector('[name="liters"]').value) || 0;
+        const pricePerLiter = parseFloat(form.querySelector('[name="price_per_liter"]').value) || 0;
+        const totalCost = parseFloat(form.querySelector('[name="cost"]').value) || (liters * pricePerLiter);
+        const fuelType = form.querySelector('[name="fuel_type"]').value;
+        const odometer = parseFloat(form.querySelector('[name="odometer"]').value) || 0;
+        const horimeter = parseFloat(form.querySelector('[name="horimeter"]').value) || 0;
+
+        // Validação de capacidade no frontend também
+        if (vehicleObj.capacity > 0 && liters > vehicleObj.capacity) {
+            alert(`Erro: Volume (${liters}L) excede a capacidade do tanque (${vehicleObj.capacity}L).`);
+            return;
+        }
+        // Validação de horímetro no frontend
+        if (horimeter > 0 && window._lastHorimeter > 0 && horimeter < window._lastHorimeter) {
+            alert(`Erro: Horímetro (${horimeter}h) não pode ser menor que o último registrado (${window._lastHorimeter}h).`);
+            return;
+        }
+
+        const res = await apiFetch('/api/data/fuels', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 vehicle_id: vId,
                 vehicle: `${vehicleObj.brand} ${vehicleObj.model} (${vehicleObj.plate})`,
+                fuel_type: fuelType,
+                liters: liters,
+                price_per_liter: pricePerLiter,
                 cost: totalCost,
-                date: new Date().toLocaleDateString()
+                odometer: odometer,
+                horimeter: horimeter,
+                date: new Date().toLocaleDateString('pt-BR')
             })
         });
-        
-        alert(`Abastecimento CADASTRADO com sucesso! Custo de R$ ${totalCost.toFixed(2).replace('.',',')} lançado para cálculos!`);
-        form.reset();
-        renderFuelTable();
+
+        if (res.ok) {
+            alert(`✅ Abastecimento registrado! ${fuelType} — ${liters}L — R$ ${totalCost.toFixed(2).replace('.',',')}`);
+            form.reset();
+            window._selectedVehicleCapacity = 0;
+            window._lastHorimeter = 0;
+            renderFuelTable();
+        } else {
+            const err = await res.json();
+            alert('Erro: ' + (err.error || 'Falha ao salvar.'));
+        }
     }
 
     // Formulário de Manutenção
     else if (e.target.id === 'maintenanceForm') {
         e.preventDefault();
         const form = e.target;
-        
-        let savedVehicles = await apiFetch('/api/data/vehicles').then(r => r.json());
-        let vId = form.querySelector('[name="vehicle_id"]').value;
-        let vehicleObj = savedVehicles.find(v => String(v.id) === String(vId)) || { brand: 'Veículo', model: 'Desconhecido', plate: 'XXX' };
-        
-        let servico = form.querySelector('[name="service_type"]').value;
-        let totalCost = parseFloat(form.querySelector('[name="cost"]').value) || 0;
 
-        await apiFetch('/api/data/maintenances', {
+        let vehicles = await apiFetch('/api/data/vehicles').then(r => r.json()).catch(() => []);
+        let vId = form.querySelector('[name="vehicle_id"]').value;
+        if (!vId) { alert('Selecione um veículo.'); return; }
+        let vehicleObj = vehicles.find(v => String(v.id) === String(vId)) || { brand: 'Veículo', model: 'Desconhecido', plate: 'XXX' };
+
+        let serviceTipo = form.querySelector('[name="service_type"]').value;
+        let serviceDetalhe = form.querySelector('[name="service_detail"]') ? form.querySelector('[name="service_detail"]').value : '';
+        let servico = serviceDetalhe ? `${serviceTipo}: ${serviceDetalhe}` : serviceTipo;
+        let totalCost = parseFloat(form.querySelector('[name="cost"]').value) || 0;
+        let horimeter = parseFloat(form.querySelector('[name="horimeter"]').value) || 0;
+
+        if (horimeter > 0 && window._maintLastHorimeter > 0 && horimeter < window._maintLastHorimeter) {
+            alert(`Erro: Horímetro (${horimeter}h) não pode ser menor que o último registrado (${window._maintLastHorimeter}h).`);
+            return;
+        }
+
+        const res = await apiFetch('/api/data/maintenances', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 vehicle_id: vId,
                 vehicle: `${vehicleObj.brand} ${vehicleObj.model} (${vehicleObj.plate})`,
                 service: servico,
                 cost: totalCost,
-                date: new Date().toLocaleDateString()
+                horimeter: horimeter,
+                date: new Date().toLocaleDateString('pt-BR')
             })
         });
-        
-        alert(`Tudo certo! Manutenção de R$ ${totalCost.toFixed(2).replace('.',',')} foi salva no diário da frota!`);
-        form.reset();
-        renderMaintenanceTable();
+
+        if (res.ok) {
+            alert(`✅ Manutenção registrada! "${servico}" — R$ ${totalCost.toFixed(2).replace('.',',')}`);
+            form.reset();
+            window._maintLastHorimeter = 0;
+            renderMaintenanceTable();
+        } else {
+            const err = await res.json();
+            alert('Erro: ' + (err.error || 'Falha ao salvar.'));
+        }
     }
 
     // Formulário de Novo Posto Radar
@@ -1331,17 +1564,24 @@ document.addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
         const name = form.querySelector('[name="name"]').value;
-        const price = form.querySelector('[name="price"]').value;
         const lat = parseFloat(form.querySelector('[name="lat"]').value);
         const lng = parseFloat(form.querySelector('[name="lng"]').value);
+        const prices = {
+            alcool: form.querySelector('[name="price_alcool"]').value || null,
+            gas: form.querySelector('[name="price_gas"]').value || null,
+            gas_ad: form.querySelector('[name="price_gas_ad"]').value || null,
+            diesel: form.querySelector('[name="price_diesel"]').value || null,
+            gnv: form.querySelector('[name="price_gnv"]').value || null
+        };
+        // Remove nulls
+        Object.keys(prices).forEach(k => { if (!prices[k]) delete prices[k]; });
 
         let stations = JSON.parse(localStorage.getItem('fcs_stations')) || [];
-        stations.push({ name, price: `R$ ${price}`, lat, lng });
+        stations.push({ name, prices, lat, lng });
         localStorage.setItem('fcs_stations', JSON.stringify(stations));
-        
-        alert("Radar Coletivo Expandido! O posto foi adicionado com sucesso.");
+        alert('✅ Posto adicionado com sucesso ao Radar Coletivo!');
         form.reset();
-        window.navigateTo('mapa_postos'); // Força a tela a regerar o mapa com o posto novo
+        window.navigateTo('mapa_postos');
     }
 
     // Formulário de Agenda / Novo Lembrete

@@ -1,17 +1,17 @@
 <!-- mapa_postos.html -->
 <div class="page-header">
     <h2><i class="fa-solid fa-map-location-dot" style="color: var(--primary-color);"></i> Mapa de Postos (Radar Geográfico)</h2>
-    <p>Localize os postos parceiros com os melhores preços avaliados pela comunidade ao seu redor (Integrado via OpenStreetMap).</p>
+    <p>Localize os postos parceiros com os melhores preços. Clique em um pino para ver os preços por combustível e abrir rotas.</p>
 </div>
 
 <div class="form-container" style="max-width: 100%; padding: 0; overflow: hidden; background: transparent; border: none; box-shadow: none;">
     <div id="fleetMap" style="height: 550px; width: 100%; border-radius: 12px; border: 1px solid var(--border-color); z-index: 1; box-shadow: var(--shadow-md);"></div>
-    <p style="margin-top: 15px; color: var(--text-muted); font-size: 0.9rem; text-align: right;"><i class="fa-solid fa-circle-info"></i> <b>Interativo:</b> Clique em qualquer rua do mapa para extrair o Radar de Captura para o seu formulário.</p>
+    <p style="margin-top: 15px; color: var(--text-muted); font-size: 0.9rem; text-align: right;"><i class="fa-solid fa-circle-info"></i> <b>Interativo:</b> Clique em qualquer rua do mapa para capturar as coordenadas. Clique nos pinos para ver preços e abrir rota.</p>
 </div>
 
 <!-- CONTAINER ADICIONAR NOVO POSTO -->
 <div class="form-container" style="max-width: 100%; margin-top: 25px;">
-    <h3 style="margin-bottom: 20px; color: var(--text-main);"><i class="fa-solid fa-map-pin"></i> Descobrir Novo Posto</h3>
+    <h3 style="margin-bottom: 20px; color: var(--text-main);"><i class="fa-solid fa-map-pin"></i> Cadastrar Novo Posto</h3>
     <form id="stationForm">
         <div class="form-row">
             <div class="form-group">
@@ -19,8 +19,28 @@
                 <input type="text" name="name" placeholder="Ex: Shell (Campinas Centro)" required>
             </div>
             <div class="form-group">
-                <label>Preço Base Observado (R$ Gasolina)</label>
-                <input type="text" name="price" placeholder="Ex: 5,49" required>
+                <label><i class="fa-solid fa-droplet" style="color:#22c55e;"></i> Álcool Comum (R$/L)</label>
+                <input type="number" step="0.01" name="price_alcool" placeholder="Ex: 4.20">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label><i class="fa-solid fa-droplet" style="color:#3b82f6;"></i> Gasolina Comum (R$/L)</label>
+                <input type="number" step="0.01" name="price_gas" placeholder="Ex: 5.89">
+            </div>
+            <div class="form-group">
+                <label><i class="fa-solid fa-droplet" style="color:#8b5cf6;"></i> Gasolina Aditivada (R$/L)</label>
+                <input type="number" step="0.01" name="price_gas_ad" placeholder="Ex: 6.29">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label><i class="fa-solid fa-droplet" style="color:#f59e0b;"></i> Diesel S10 (R$/L)</label>
+                <input type="number" step="0.01" name="price_diesel" placeholder="Ex: 6.49">
+            </div>
+            <div class="form-group">
+                <label><i class="fa-solid fa-droplet" style="color:#ef4444;"></i> GNV (R$/m³)</label>
+                <input type="number" step="0.01" name="price_gnv" placeholder="Ex: 4.80">
             </div>
         </div>
         <div class="form-row">
