@@ -14,38 +14,52 @@ dotenv.config();
 
 const app = express();
 
+// Middleware de Logs para Debug (Railway)
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // Middlewares globais
 app.use(cors());
-app.use(express.json()); // Permite ler JSON no body das requisições
-
-// Serve os arquivos do site (Frontend SPA) diretamente
-app.use(express.static(path.join(__dirname, 'frontend')));
+app.use(express.json());
 
 // Rota da API base
 app.get('/api/status', (req, res) => {
     res.json({
         success: true,
         message: 'NexusFleet API está rodando com SQLite!',
-        version: '1.1.0'
+        version: '1.2.0'
     });
 });
 
 // Importação das Rotas da API (SQLite)
-const apiRoutes = require('./src/routes/api.routes');
+const apiRoutes = require('./src/routes/api.routes.js');
 app.use('/api', apiRoutes);
 
-// Importação das Rotas de Usuários (Login/Register)
-const userRoutes = require('./src/routes/user.routes');
+const userRoutes = require('./src/routes/user.routes.js');
 app.use('/api/users', userRoutes);
 
-// Força acesso na rota raiz (/) a retornar o HTML principal
+// Serve os arquivos do site (Frontend SPA) - Colocado após a API para não conflitar
+const frontendPath = path.join(process.cwd(), 'frontend');
+app.use(express.static(frontendPath));
+
+// Força acesso na rota raiz (/) a retornar o index.html ou redirecionar se necessário
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+    res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
-// Tratamento de Rota não encontrada (404)
+// Tratamento de Rota não encontrada (404) para API vs Frontend
 app.use((req, res, next) => {
-    res.status(404).json({ error: 'Endpoint não encontrado.' });
+    if (req.url.startsWith('/api')) {
+        return res.status(404).json({ error: 'Endpoint da API não encontrado.' });
+    }
+    // Para rotas do frontend que não existem como arquivos, envia o index.html (padrão SPA)
+    res.sendFile(path.join(frontendPath, 'index.html'), (err) => {
+        if (err) {
+            res.status(404).json({ error: 'Arquivo frontend não encontrado.' });
+        }
+    });
 });
 
 // Inicialização do Servidor com fallback de porta para evitar EADDRINUSE e bind 0.0.0.0 para Railway
